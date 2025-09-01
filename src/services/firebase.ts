@@ -1,21 +1,23 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+// src/services/firebase.ts
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth, GoogleAuthProvider, browserLocalPersistence } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBIx4gATd2e69AMoA2G59JurPvir4eP8do",
-  authDomain: "comparafy-versao-2.firebaseapp.com",
-  projectId: "comparafy-versao-2",
-  storageBucket: "comparafy-versao-2.firebasestorage.app",
-  messagingSenderId: "251867024258",
-  appId: "1:251867024258:web:605134aaa454249c1d9d9b",
-  measurementId: "G-80ZRH94489"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const auth: Auth = getAuth(app);
+export const db: Firestore = getFirestore(app);
+
+// persistência padrão para toda a app
+auth.setPersistence(browserLocalPersistence).catch(() => {});
+
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });

@@ -6,17 +6,12 @@ import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-
-  // 🔧 ajuda a reduzir o bundle e silencia warning exagerado enquanto ajustamos
   build: {
-    chunkSizeWarningLimit: 1600, // 1.6 MiB
+    chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
-        // separa libs pesadas em chunks próprios
         manualChunks: {
           react: ['react', 'react-dom'],
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
@@ -26,7 +21,6 @@ export default defineConfig({
       },
     },
   },
-
   plugins: [
     react(),
     VitePWA({
@@ -44,12 +38,8 @@ export default defineConfig({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
         ],
       },
-      // ✅ corrige o erro de “Assets exceeding the limit”
       workbox: {
-        // aumenta o limite padrão (2 MiB) para suportar seu bundle atual
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024, // 6 MiB
-        // (opcional) se quiser excluir JS grandes do precache, descomente:
-        // globPatterns: ['**/*.{html,css,ico,png,svg,webp}'],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
     }),
   ],

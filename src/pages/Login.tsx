@@ -1,18 +1,16 @@
 // src/pages/Login.tsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  GoogleAuthProvider,
   signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  setPersistence,
-  browserLocalPersistence,
+  getRedirectResult,
 } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
-import { auth } from "@/services/firebase";
+import { auth, googleProvider } from "@/services/firebase";
 
-const logoUrl = import.meta.env.BASE_URL + "COMPARAFY.png"; // ✅ BASE_URL padronizado
+const logoUrl = import.meta.env.BASE_URL + "COMPARAFY.png";
 
 const GoogleIcon = ({ className = "h-5 w-5" }) => (
   <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
@@ -53,17 +51,26 @@ export default function Login() {
 
   const goHome = () => nav("/", { replace: true });
 
+  // Se o Google usar redirect, capturamos o resultado aqui
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getRedirectResult(auth);
+        if (res?.user) goHome();
+      } catch (e: any) {
+        setErr(friendlyError(e?.code));
+      }
+    })();
+  }, []);
+
   const loginEmailSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     setLoading(true);
     try {
-      sessionStorage.setItem("authType", "email");
-      await setPersistence(auth, browserLocalPersistence);
       await signInWithEmailAndPassword(auth, email.trim(), senha);
       goHome();
     } catch (e: any) {
-      sessionStorage.removeItem("authType");
       setErr(friendlyError(e?.code));
     } finally {
       setLoading(false);
@@ -73,13 +80,8 @@ export default function Login() {
   const loginGoogle = async () => {
     setErr(null);
     setLoading(true);
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
-
     try {
-      sessionStorage.setItem("authType", "google");
-      await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(auth, provider);
+      await signInWithPopup(auth, googleProvider);
       goHome();
     } catch (e: any) {
       if (
@@ -88,14 +90,12 @@ export default function Login() {
       ) {
         try {
           setErr("O navegador bloqueou o popup. Redirecionando…");
-          await signInWithRedirect(auth, provider);
+          await signInWithRedirect(auth, googleProvider);
           return;
         } catch (er: any) {
-          sessionStorage.removeItem("authType");
           setErr(friendlyError(er?.code));
         }
       } else {
-        sessionStorage.removeItem("authType");
         setErr(friendlyError(e?.code));
       }
     } finally {
@@ -107,12 +107,9 @@ export default function Login() {
     setErr(null);
     setLoading(true);
     try {
-      sessionStorage.setItem("authType", "anonymous");
-      await setPersistence(auth, browserLocalPersistence);
       await signInAnonymously(auth);
       goHome();
     } catch (e: any) {
-      sessionStorage.removeItem("authType");
       setErr(friendlyError(e?.code));
     } finally {
       setLoading(false);
@@ -121,15 +118,9 @@ export default function Login() {
 
   return (
     <main className="min-h-screen w-full grid place-items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24">
-      <div className="w-full mx-auto
-        max-w-[420px] sm:max-w-[480px] md:max-w-[560px]
-        lg:max-w-[640px] xl:max-w-[720px] 2xl:max-w-[820px]">
-
+      <div className="w-full mx-auto max-w-[420px] sm:max-w-[480px] md:max-w-[560px] lg:max-w-[640px] xl:max-w-[720px] 2xl:max-w-[820px]">
         <img src={logoUrl} alt="COMPARAFY" className="mx-auto mt-2 mb-8 sm:mb-10 h-7 w-auto" />
-
-        <h1 className="text-center text-2xl font-semibold text-slate-900">
-          Entre com sua conta
-        </h1>
+        <h1 className="text-center text-2xl font-semibold text-slate-900">Entre com sua conta</h1>
 
         <form onSubmit={loginEmailSenha} className="mt-5 space-y-3">
           <input
@@ -149,11 +140,7 @@ export default function Login() {
             onChange={(e) => setSenha(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-[15px] outline-none ring-yellow-500/20 focus:ring-4"
           />
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-2xl bg-yellow-500 px-4 py-3 font-semibold text-black shadow hover:brightness-95 disabled:opacity-60"
-          >
+          <button type="submit" disabled={loading} className="w-full rounded-2xl bg-yellow-500 px-4 py-3 font-semibold text-black shadow hover:brightness-95 disabled:opacity-60">
             Entrar
           </button>
         </form>
