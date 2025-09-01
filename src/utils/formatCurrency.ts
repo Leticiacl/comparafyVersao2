@@ -1,0 +1,1 @@
+export const formatCurrency = (n: number) => (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });

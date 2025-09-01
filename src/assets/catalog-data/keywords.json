@@ -1,0 +1,80 @@
+[
+    { "category": "FRUTAS/VERDURAS 1", "keywords": [
+      "alface", "banana", "tomate", "maça", "maca", "pera", "uva", "mamao", "mamão",
+      "batata", "cebola", "alho poro", "alho-poro", "cenoura", "abobrinha", "pepino",
+      "couve", "couve-flor", "brocolis", "brócolis", "hortifruti", "verdura", "fruta", "legume"
+    ]},
+    { "category": "Bebidas", "keywords": [
+      "refrigerante", "coca", "cola", "guarana", "antarctica", "soda", "sprite",
+      "fanta", "pepsi", "tubaína", "tubaina", "refr."
+    ]},
+    { "category": "AGUAS/SUCOS 1", "keywords": [
+      "agua", "água", "mineral", "sem gas", "com gas", "suco", "nectar", "chá gelado", "cha gelado"
+    ]},
+    { "category": "LEITE", "keywords": [
+      "leite", "lactose", "semi desnatado", "semidesnatado", "desnatado"
+    ]},
+    { "category": "Laticínios e Frios", "keywords": [
+      "iogurte", "queijo", "muçarela", "mussarela", "requeijao", "requeijão",
+      "manteiga", "cream cheese", "queijinho", "coalho", "ricota"
+    ]},
+    { "category": "Padaria", "keywords": [
+      "pao", "pão", "fatia", "pão de forma", "pao de forma", "bolo", "torta", "croissant", "biscoito amanteigado"
+    ]},
+    { "category": "MASSAS", "keywords": [
+      "macarrao", "macarrão", "massa", "espaguete", "parafuso", "penne", "talharim", "lasanha"
+    ]},
+    { "category": "BISCOITOS", "keywords": [
+      "biscoito", "bolacha", "recheado", "cream cracker", "maisena", "maizena"
+    ]},
+    { "category": "CHOCOLATES BOMBONS", "keywords": [
+      "chocolate", "bombom", "cacao", "cacau", "barra chocolate"
+    ]},
+    { "category": "DOCES/SALGADOS 1", "keywords": [
+      "bala", "pirulito", "doce", "goma", "jujuba"
+    ]},
+    { "category": "Matinais", "keywords": [
+      "arroz", "feijao", "feijão", "acucar", "açúcar", "cafe", "café", "cereal matinal"
+    ]},
+    { "category": "TEMP/MOLH/ENLAT 1", "keywords": [
+      "milho", "ervilha", "enlatado", "molho tomate", "extrato tomate", "tomate pelado"
+    ]},
+    { "category": "CONDIMENTOS ALHOS", "keywords": [
+      "ketchup", "maionese", "mostarda", "alho", "pimenta", "chimichurri", "tempero", "ervas"
+    ]},
+    { "category": "MAT LIMPEZA 1", "keywords": [
+      "detergente", "sabao po", "sabão em po", "amaciante", "desinfetante", "multiuso",
+      "limpeza", "agua sanitaria", "água sanitária", "candida", "cloro", "esponja"
+    ]},
+    { "category": "ITENS DOMESTICO 1", "keywords": [
+      "esponja", "louça", "prato", "talher", "panela", "utensilio", "saco lixo"
+    ]},
+    { "category": "DESCARTAVEIS 1", "keywords": [
+      "papel toalha", "guardanapo", "prato descartavel", "copos descartaveis", "garfo descartavel", "aluminio", "filme pvc"
+    ]},
+    { "category": "Higiene e Perfumaria", "keywords": [
+      "desodorante", "shampoo", "sabonete", "condicionador", "creme dental", "fio dental", "perfume"
+    ]},
+    { "category": "ACOUGUE 1", "keywords": [
+      "carne bovina", "boi", "bovino", "alcatra", "acem", "coxao", "patinho", "picanha"
+    ]},
+    { "category": "ACOUGUE 2", "keywords": [
+      "frango", "suino", "suíno", "linguica", "linguiça", "coxa", "sobrecoxa", "peito frango"
+    ]},
+    { "category": "RACAO 1", "keywords": [
+      "racao", "ração", "pet", "cachorro", "gato"
+    ]},
+    { "category": "FAXINA MERCADO", "keywords": [
+      "carvao", "carvão", "vassoura", "rodo", "balde"
+    ]},
+    { "category": "BEBIDAS DESTILADAS", "keywords": [
+      "vodka", "whisky", "gin", "rum", "tequila", "cachaça", "cachaca"
+    ]},
+    { "category": "CONGELADOS SORVETES", "keywords": [
+      "sorvete", "picolé", "picole", "gelado"
+    ]},
+    { "category": "Congelados", "keywords": [
+      "pizza congelada", "lasanha congelada", "congelado"
+    ]}
+  ]
+  

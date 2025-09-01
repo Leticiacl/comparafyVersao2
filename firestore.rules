@@ -1,0 +1,29 @@
+// Firestore Security Rules - Comparafy (strict, per-user)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() { return request.auth != null && resource.data.uid == request.auth.uid; }
+    function isOwnerOnCreate() { return request.auth != null && request.resource.data.uid == request.auth.uid; }
+
+    match /lists/{docId} {
+      allow read: if isOwner();
+      allow create: if isOwnerOnCreate();
+      allow update, delete: if isOwner();
+    }
+    match /purchases/{docId} {
+      allow read: if isOwner();
+      allow create: if isOwnerOnCreate();
+      allow update, delete: if isOwner();
+    }
+    match /{collection}/{docId} {
+      allow read: if isOwner();
+      allow create: if isOwnerOnCreate();
+      allow update, delete: if isOwner();
+    }
+    match /{collection}/{docId}/{sub}/{subId} {
+      allow read: if isOwner();
+      allow create: if isOwnerOnCreate();
+      allow update, delete: if isOwner();
+    }
+  }
+}

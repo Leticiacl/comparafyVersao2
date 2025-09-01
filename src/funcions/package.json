@@ -1,0 +1,20 @@
+{
+  "name": "comparafy-functions",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": { "node": "18" },
+  "scripts": {
+    "build": "tsc",
+    "deploy": "npm run build && firebase deploy --only functions:parseNfce"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.1.1",
+    "cross-fetch": "^4.0.0",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

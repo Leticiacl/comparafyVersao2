@@ -1,0 +1,210 @@
+{
+    "Refrigerante": [
+      "refrigerante", "refri", "refris", "refrigerante pet", "lata",
+      "coca", "coca cola", "coca-cola", "kuat",
+      "guarana", "guaraná", "guarana antarctica", "antarctica",
+      "pepsi",
+      "fanta", "fanta laranja", "fanta uva", "sukita", "sprite", "dolly", "soda",
+      "pet", "garrafa 2l", "2l", "2 litros", "1,5l", "1.5l", "1l", "600ml", "350ml", "lata 350",
+      "zero", "sem acucar", "sem açúcar", "diet", "light"
+    ],
+  
+    "Suco": [
+      "suco", "refresco", "pozinho suco", "po suco", "sache suco", "sachê suco", "suco em po", "suco em pó",
+      "suco concentrado", "suco integral", "polpa de fruta",
+      "ades", "del valle", "do bem", "natural one", "maguary", "tang", "mid", "clight",
+      "nectar", "néctar", "uva integral", "suco garrafa", "caixinha suco", "pronto para beber", "ppb"
+    ],
+  
+    "Água": [
+      "agua", "água", "agua mineral", "água mineral", "garrafa de agua", "garrafa d'agua",
+      "sem gas", "sem gás", "com gas", "com gás",
+      "minalba", "crystal", "bonafont", "sao lourenco", "são lourenço", "ibira", "serra do ipa"
+    ],
+  
+    "Isotônico": [
+      "isotonico", "isotônico", "hidratante esportivo", "bebida esportiva",
+      "gatorade", "powerade"
+    ],
+  
+    "Energético": [
+      "energetico", "energético", "energy drink",
+      "red bull", "monster", "fusion", "vibe"
+    ],
+  
+    "Cerveja": [
+      "cerveja", "breja", "long neck", "longneck", "latinha 350", "litrão",
+      "pilsen", "lager", "ipa", "weiss", "stout",
+      "skol", "brahma", "antarctica", "original", "serramalte",
+      "heineken", "budweiser", "amstel", "stella artois", "itaipava", "petra", "schin", "bohemia",
+      "corona", "beck's", "bud"
+    ],
+  
+    "Vinho e Destilados": [
+      "vinho", "vinho tinto", "vinho branco", "rose", "rosé", "espumante",
+      "cachaça", "pinga", "vodka", "whisky", "rum", "gin", "licor"
+    ],
+  
+    "Café e Chá": [
+      "cafe", "café", "po de cafe", "pó de café", "cafe em po", "café solúvel", "soluvel",
+      "capsula cafe", "cápsula", "capsulas", "cápsulas",
+      "cha", "chá", "erva mate", "chimarrao", "chimarrão", "mate leao", "mate leão",
+      "leite em po para cafe", "açucar para cafe", "acucar para cafe"
+    ],
+  
+    "Açúcar e Adoçante": [
+      "acucar", "açúcar", "acucar cristal", "refinado", "demerara", "mascavo",
+      "adoçante", "adocante", "stevia", "sucralose", "aspartame", "açucar demerara", "acucar mascavo"
+    ],
+  
+    "Farinhas e Fermentos": [
+      "farinha", "farinha de trigo", "farinha integral", "farinha de milho", "fuba", "fubá",
+      "amido de milho", "maizena", "fermento", "fermento biologico", "fermento químico"
+    ],
+  
+    "Arroz e Grãos": [
+      "arroz", "arroz branco", "arroz parboilizado", "arroz integral", "arroz agulhinha",
+      "arroz 5 kg", "arroz 1kg",
+      "grao de bico", "grão de bico", "lentilha", "ervilha seca", "quinua", "quinoa",
+      "aveia em flocos", "aveia fina", "farelo de aveia"
+    ],
+  
+    "Feijão": [
+      "feijao", "feijão", "feijao carioca", "feijão carioca", "feijao preto", "feijão preto",
+      "feijao fradinho", "feijao jalo", "feijao jalo roxo"
+    ],
+  
+    "Massas": [
+      "macarrao", "macarrão", "espaguete", "espagueti", "parafuso", "penne", "talharim", "lasanha", "nhoque", "massa fresca",
+      "instantaneo", "instantâneo", "miojo", "lamen", "lámen",
+      "molho para macarrao", "molho pronto", "extrato de tomate", "pomidoro"
+    ],
+  
+    "Óleos e Azeites": [
+      "oleo", "óleo", "oleo de soja", "oleo de girassol", "oleo de canola", "oleo de milho",
+      "azeite", "azeite de oliva", "azeite extra virgem",
+      "spray de oleo", "oleo 900ml", "lata de azeite"
+    ],
+  
+    "Enlatados e Conservas": [
+      "milho verde", "ervilha", "seleta de legumes", "seleta",
+      "atum", "sardinha", "molho de tomate", "polpa de tomate", "tomate pelado",
+      "palmito", "pepino em conserva", "azeitona", "grão de bico enlatado"
+    ],
+  
+    "Temperos e Condimentos": [
+      "sal", "sal grosso", "sal light", "pimenta do reino", "pimenta", "páprica", "colorau", "cominho", "noz moscada",
+      "alho em po", "cebola em po", "tempero pronto", "sazon", "caldo knorr", "caldo de galinha", "caldo de carne",
+      "ketchup", "mostarda", "maionese", "barbecue", "shoyu", "molho ingles", "molho inglês",
+      "vinagre", "vinagre de alcool", "vinagre de arroz", "vinagre balsamico", "mostarda dijon"
+    ],
+  
+    "Biscoitos e Snacks": [
+      "biscoito", "bolacha", "cream cracker", "agua e sal", "água e sal",
+      "recheado", "bono", "trakinas", "club social", "wafer",
+      "salgadinho", "chips", "batata chips", "batata ruffles", "doritos", "cheetos", "fandangos",
+      "pipoca de microondas", "pipoca microondas", "pipoca para microondas"
+    ],
+  
+    "Doces e Chocolates": [
+      "chocolate", "tablete", "barras de chocolate", "ao leite", "meio amargo",
+      "achocolatado", "toddy", "nescau",
+      "bala", "pirulito", "doce de leite", "goiabada", "paçoca", "biscoito recheado chocolate"
+    ],
+  
+    "Cereais Matinais": [
+      "cereal", "cereal matinal", "sucrilhos", "corn flakes", "aveia matinal", "granola"
+    ],
+  
+    "Laticínios": [
+      "leite", "leite integral", "leite desnatado", "leite semidesnatado", "leite uht", "leite longa vida",
+      "queijo", "queijo muçarela", "muçarela", "mussarela", "queijo prato", "queijo minas", "queijo parmesao", "parmesão",
+      "manteiga", "margarina", "requeijao", "requeijão", "cream cheese",
+      "iogurte", "bebida lactea", "bebida láctea", "coalhada", "leite fermentado",
+      "creme de leite", "leite condensado", "chantilly", "nata"
+    ],
+  
+    "Padaria": [
+      "pao", "pão", "pao frances", "pão francês", "pao de forma", "pão de forma",
+      "bisnaga", "baguete", "pao integral", "pão integral",
+      "bolo", "bolo de fubá", "bolo de chocolate", "torta", "rosca", "sonho", "pao doce"
+    ],
+  
+    "Frios e Embutidos": [
+      "presunto", "peito de peru", "mortadela", "salame",
+      "salsicha", "linguica", "linguiça", "paio", "bacon", "apresuntado"
+    ],
+  
+    "Carnes": [
+      "carne", "carne bovina", "carne suina", "carne suína", "carne moida", "carne moída",
+      "fraldinha", "patinho", "acém", "acem", "alcatra", "coxao mole", "coxão mole", "picanha",
+      "frango", "peito de frango", "coxa", "sobrecoxa", "asa", "file de frango", "filé de frango",
+      "peixe", "tilapia", "sardinha fresca", "salmao", "salmão", "bacalhau"
+    ],
+  
+    "Ovos": [
+      "ovo", "ovos", "duzia de ovos", "meia duzia", "ovos caipiras", "ovos brancos", "ovos vermelhos"
+    ],
+  
+    "Congelados": [
+      "congelado", "lasanha congelada", "pizza congelada", "hamburguer congelado", "nuggets", "batata congelada", "sorvete", "açaí"
+    ],
+  
+    "Hortifruti": [
+      "banana", "maca", "maçã", "pera", "uva", "melao", "melão", "melancia", "abacaxi", "goiaba", "manga", "maracuja", "maracujá",
+      "alface", "couve", "espinafre", "rucula", "rúcula", "agrião", "agriao",
+      "tomate", "cebola", "alho", "cenoura", "batata", "batata doce", "abobora", "abóbora", "pepino", "pimentao", "pimentão", "chuchu", "abobrinha", "berinjela", "quiabo", "inhame", "mandioca", "aipim", "batata baroa"
+    ],
+  
+    "Mercearia Salgada": [
+      "sopa pronta", "sopa em po", "caldo pronto", "sachê tempero",
+      "molho branco", "bechamel", "molho quatro queijos", "pesto",
+      "patê", "maionese saborizada", "azeitonas recheadas"
+    ],
+  
+    "Higiene Pessoal": [
+      "sabonete", "shampoo", "condicionador", "creme para pentear", "leave in",
+      "desodorante", "antitranspirante", "perfume", "colônia",
+      "creme dental", "pasta de dente", "escova de dente", "fio dental", "enxaguante bucal",
+      "papel cotonete", "cotonete", "absorvente"
+    ],
+  
+    "Papelaria e Descartáveis": [
+      "papel higienico", "papel higiênico", "guardanapo", "papel toalha",
+      "aluminio", "papel aluminio", "papel alumínio", "filme pvc", "filme plastico", "plástico filme",
+      "prato descartavel", "copo descartavel", "talheres descartaveis", "sacolas", "ziplock", "zip lock"
+    ],
+  
+    "Material de limpeza": [
+      "alvejante", "detergente", "bucha", "esponja", "amaciante", "desengordurante",
+      "cif", "sapolio", "sapólio", "cloro", "veja", "limpa piso", "desinfetante", "multiuso", "limpa vidros",
+      "sabao em po", "sabão em pó", "po lava roupas", "lava roupas", "lava loucas", "lava louças", "detergente maquina", "detergente máquina",
+      "sabao em barra", "sabão em barra", "água sanitária", "agua sanitaria", "limpa banheiro",
+      "desinfetante pinho", "pinho sol", "candida", "cândida", "omo", "ypê", "ypie", "brilhante"
+    ],
+  
+    "Cuidados com Roupas": [
+      "amaciante", "amaciante concentrado", "tira manchas", "vanish", "passa facil", "passe bem"
+    ],
+  
+    "Bebê": [
+      "fralda", "fraldas", "fralda descartavel", "lenço umedecido", "lenco umedecido",
+      "pomada antiassadura", "talco", "shampoo infantil"
+    ],
+  
+    "Pet": [
+      "racao", "ração", "racao para cachorro", "racao para gato",
+      "petisco pet", "sache pet", "areia para gato"
+    ],
+  
+    "Utilidades": [
+      "pilha", "bateria", "vela", "fosforo", "fósforo",
+      "lampada", "lâmpada", "extensao", "extensão",
+      "isqueiro", "prendedor de roupa", "bacia", "balde", "vassoura", "rodo", "pano de chão"
+    ],
+  
+    "Outros": [
+      "diversos", "outros"
+    ]
+  }
+  

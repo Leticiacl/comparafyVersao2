@@ -1,0 +1,46 @@
+[
+  { "name": "coca cola",     "category": "Bebidas > Refrigerante", "synonyms": ["coca", "refrigerante coca", "coca-cola"] },
+  { "name": "pepsi",         "category": "Bebidas > Refrigerante", "synonyms": ["pepsi cola"] },
+  { "name": "guaraná",       "category": "Bebidas > Refrigerante", "synonyms": ["guarana", "antarctica"] },
+  { "name": "fanta",         "category": "Bebidas > Refrigerante", "synonyms": ["fanta laranja", "fanta uva"] },
+
+  { "name": "suco em pó",    "category": "Bebidas > Suco em pó",    "synonyms": ["refresco", "sukita pó", "tang", "clight", "suco pacote", "pozinho suco"] },
+  { "name": "suco pronto",   "category": "Bebidas > Suco",          "synonyms": ["suco caixinha", "nectar"] },
+  { "name": "água mineral",  "category": "Bebidas > Água",          "synonyms": ["agua", "agua sem gas", "água com gás"] },
+  { "name": "cerveja",       "category": "Bebidas > Cerveja",       "synonyms": ["lager", "pilsen"] },
+
+  { "name": "detergente",    "category": "Limpeza > Louças",        "synonyms": ["detergente liquido", "detergente prato"] },
+  { "name": "amaciante",     "category": "Limpeza > Roupas",        "synonyms": ["amaciante roupa"] },
+  { "name": "alvejante",     "category": "Limpeza > Roupas",        "synonyms": ["agua sanitária", "água sanitaria", "cândida", "candida"] },
+  { "name": "desengordurante","category":"Limpeza > Superfícies",   "synonyms": ["cif", "multiuso", "limpa cozinha"] },
+  { "name": "esponja",       "category": "Limpeza > Utensílios",    "synonyms": ["bucha", "esponja prato"] },
+
+  { "name": "sabonete",      "category": "Higiene > Banho",         "synonyms": ["sabonete em barra"] },
+  { "name": "shampoo",       "category": "Higiene > Cabelos",       "synonyms": ["xampu"] },
+  { "name": "pasta de dente","category": "Higiene > Bucal",         "synonyms": ["creme dental", "dentifrício", "colgate"] },
+
+  { "name": "arroz",         "category": "Mercearia > Grãos",       "synonyms": ["arroz branco", "arroz tipo 1"] },
+  { "name": "feijão",        "category": "Mercearia > Grãos",       "synonyms": ["feijao", "feijão carioca", "feijão preto"] },
+  { "name": "açúcar",        "category": "Mercearia > Açúcares",    "synonyms": ["acucar", "açucar cristal", "açúcar refinado"] },
+  { "name": "macarrão",      "category": "Mercearia > Massas",      "synonyms": ["massa", "espaguete", "parafuso"] },
+  { "name": "molho de tomate","category":"Mercearia > Molhos",      "synonyms": ["molho tomate", "passata", "extrato tomate"] },
+  { "name": "óleo de soja",  "category": "Mercearia > Óleos",       "synonyms": ["oleo soja", "óleo cozinha"] },
+  { "name": "farinha de trigo","category":"Mercearia > Farinhas",   "synonyms": ["farinha trigo"] },
+
+  { "name": "leite",         "category": "Frios & Laticínios > Leites", "synonyms": ["leite integral", "leite semidesnatado"] },
+  { "name": "queijo",        "category": "Frios & Laticínios > Queijos", "synonyms": ["muçarela", "mussarela", "prato", "queijo fatiado"] },
+  { "name": "manteiga",      "category": "Frios & Laticínios > Cremes",  "synonyms": ["margarina", "creme vegetal"] },
+  { "name": "iogurte",       "category": "Frios & Laticínios > Iogurtes", "synonyms": ["yogurte", "bebida lactea"] },
+
+  { "name": "pão",           "category": "Padaria > Pães",          "synonyms": ["pao", "pão francês", "pão de forma"] },
+  { "name": "bolo",          "category": "Padaria > Bolos",         "synonyms": ["bolo de forma", "bolo pronto"] },
+
+  { "name": "carne bovina",  "category": "Açougue > Bovinos",       "synonyms": ["patinho", "acém", "contra filé", "coxão"] },
+  { "name": "frango",        "category": "Açougue > Aves",          "synonyms": ["peito frango", "coxa sobrecoxa", "sassami"] },
+  { "name": "linguiça",      "category": "Açougue > Embutidos",     "synonyms": ["calabresa", "linguica"] },
+
+  { "name": "banana",        "category": "Hortifruti > Frutas",     "synonyms": ["banana prata", "banana nanica"] },
+  { "name": "maçã",          "category": "Hortifruti > Frutas",     "synonyms": ["maca", "maçã fuji", "maçã gala"] },
+  { "name": "alface",        "category": "Hortifruti > Folhas",     "synonyms": ["alface crespa", "alface lisa"] },
+  { "name": "tomate",        "category": "Hortifruti > Legumes",    "synonyms": ["tomate italiano", "tomate saladete"] }
+]

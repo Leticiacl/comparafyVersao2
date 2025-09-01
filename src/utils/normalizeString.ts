@@ -1,0 +1,1 @@
+export function normalizeString(s?: string): string { if (!s) return ""; return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim(); }

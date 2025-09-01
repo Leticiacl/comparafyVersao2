@@ -1,3 +1,7 @@
-# comparafyVersao2
+# Comparafy - TCC UFOP
 
-[Edit in StackBlitz next generation editor ⚡️](https://stackblitz.com/~/github.com/Leticiacl/comparafyVersao2)
+## Getting Started
+
+1. Run `npm install && npm install firebase && npm install @headlessui/react && npm install sonner && npm run dev && npm install react-qr-reader && npm install chart.js react-chartjs-2, npm i react-qr-reader sonner`
+`
+2. Run `npm run dev`
