@@ -1,39 +1,21 @@
-// src/services/firebase.ts
+// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import {
-  getAuth,
-  GoogleAuthProvider,
-  signInAnonymously,
-} from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, // ex.: <PROJECT_ID>.appspot.com
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyBIx4gATd2e69AMoA2G59JurPvir4eP8do",
+  authDomain: "comparafy-versao-2.firebaseapp.com",
+  projectId: "comparafy-versao-2",
+  storageBucket: "comparafy-versao-2.firebasestorage.app",
+  messagingSenderId: "251867024258",
+  appId: "1:251867024258:web:605134aaa454249c1d9d9b",
+  measurementId: "G-80ZRH94489"
 };
 
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app); // <- necessário para upload de avatar
-
-// Provider do Google
-export const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: "select_account" });
-
-export async function ensureAnonymousSession(): Promise<string> {
-  let user = auth.currentUser;
-  if (!user) {
-    const cred = await signInAnonymously(auth);
-    user = cred.user;
-  }
-  sessionStorage.setItem("user", JSON.stringify({ uid: user.uid }));
-  sessionStorage.setItem("userId", user.uid);
-  sessionStorage.setItem("authType", "anonymous");
-  return user.uid;
-}
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
