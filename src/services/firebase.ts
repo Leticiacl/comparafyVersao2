@@ -4,14 +4,20 @@ import { getAuth, type Auth, GoogleAuthProvider, browserLocalPersistence } from 
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
 function required(name: string, value: string | undefined) {
-  if (!value) throw new Error(`[Firebase ENV] Faltando ${name}. Verifique as env VITE_* no Vercel.`);
+  if (!value) throw new Error(`[Firebase ENV] Faltando ${name}. Verifique as env VITE_* no Vercel/.env.local.`);
   return value;
 }
 
 const apiKey = required('VITE_FIREBASE_API_KEY', import.meta.env.VITE_FIREBASE_API_KEY);
+
+// 👇 ajuda a detectar env errado rapidamente
+if (import.meta.env.DEV) {
+  // mostra só os 5 primeiros chars para não vazar a key
+  console.log('[Firebase ENV] apiKey prefix:', String(apiKey).slice(0, 5));
+}
+
 if (!apiKey.startsWith('AIza')) {
-  // Ajuda a diagnosticar build com chave errada
-  throw new Error('[Firebase ENV] apiKey inválida (não começa com "AIza"). Confira as env no Vercel.');
+  throw new Error('[Firebase ENV] apiKey inválida (não começa com "AIza"). Confira as env no Vercel/.env.local.');
 }
 
 const firebaseConfig = {
