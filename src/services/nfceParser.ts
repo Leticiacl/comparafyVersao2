@@ -1,8 +1,9 @@
 // src/services/nfceParser.ts
 import { T, numBR, parseQtyMG, unitMap, capFirst, stripCodigo } from "@/utils/nfce";
-import { postReceipt } from '@/services/api';
-import { auth } from '@/services/firebase';
+import { postReceipt } from "@/services/api";
+import { auth } from "@/services/firebase";
 
+/* ---------------- tipos ---------------- */
 export type ReceiptItem = {
   nome: string;
   quantidade: number;
@@ -21,10 +22,20 @@ export type ReceiptParseResult = {
   grandTotal?: number;   // “Valor total R$” (rodapé)
 };
 
+export type ReceiptMeta = {
+  accessKey: string;       // 44 dígitos
+  issuedAtISO: string;     // ISO
+  uf: string;              // "MG", "SP", ...
+  storeName: string;
+  cnpj?: string;
+  cityName?: string;
+  grandTotal?: number;
+};
+
+/* ---------------- fetch helpers ---------------- */
 const PROXY = (import.meta as any).env?.VITE_NFCE_PROXY || "/api/nfce-proxy";
 const FORCE_PROXY = ((import.meta as any).env?.VITE_FORCE_PROXY || "0") === "1";
 
-/* ---------------- fetch helpers ---------------- */
 async function fetchViaProxy(url: string): Promise<string | null> {
   try {
     const endpoint = PROXY.startsWith("http") ? PROXY : `${location.origin}${PROXY}`;
@@ -64,6 +75,37 @@ async function fetchHtml(url: string): Promise<{ html: string; mode: string }> {
   throw new Error("nfce_fetch_failed");
 }
 
+/* ---------------- helpers de metadados ---------------- */
+function extractUF(url: string, doc: Document): string | undefined {
+  if (/\.mg\.gov\.br/i.test(url)) return "MG";
+  if (/\.sp\.gov\.br/i.test(url)) return "SP";
+  if (/\.es\.gov\.br/i.test(url)) return "ES";
+  const txt = doc.body?.textContent || "";
+  const m = txt.match(/\bUF[:\s-]*([A-Z]{2})\b/);
+  return m?.[1];
+}
+function extractAccessKey(url: string, doc: Document): string | undefined {
+  const mUrl = url.match(/\b(\d{44})\b/);
+  if (mUrl) return mUrl[1];
+  const txt = doc.body?.textContent || "";
+  const mTxt = txt.match(/\b(\d{44})\b/);
+  return mTxt?.[1];
+}
+function extractStoreInfo(doc: Document): {
+  storeName?: string; cnpj?: string; cityName?: string;
+} {
+  const text = doc.body?.textContent || "";
+  const findAfter = (re: RegExp) =>
+    text.match(new RegExp(re.source + "\\s*[:\\-]?\\s*(.+)", re.flags))?.[1]?.split("\n")[0]?.trim();
+  const storeName =
+    (doc.querySelector("#spnNomeEmitente") as HTMLElement)?.innerText?.trim() ||
+    findAfter(/Emitente|Raz[aã]o Social|Nome do Estabelecimento/i);
+  const cnpj = (text.match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/) || [])[0];
+  const cityName = findAfter(/Munic[ií]pio|Cidade/i) ||
+    (doc.querySelector("#spnMunicipio") as HTMLElement)?.innerText?.trim();
+  return { storeName, cnpj, cityName };
+}
+
 /* ------------- parser MG por colunas ------------- */
 function parsePortalMG(doc: Document): ReceiptParseResult | null {
   const itens: ReceiptItem[] = [];
@@ -84,7 +126,6 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     if (!isNaN(dt.getTime())) date = dt;
   }
 
-  
   // Totais (rodapé)
   const allText = T(doc.body);
   const mTotI = allText.match(/Qtde total de itens\s*[:\-]?\s*(\d+)/i);
@@ -198,30 +239,8 @@ function parseGeneric(doc: Document): ReceiptParseResult | null {
   if (!itens.length) return null;
   return { name: "Compra (NFC-e)", itens };
 }
-const payload = {
-  accessKey,               // string 44 dígitos
-  issuedAt,                // string ISO ex: new Date().toISOString()
-  uf,                      // "MG", "SP"...
-  store: {
-    name: storeName,
-    cnpj,                  // opcional
-    city: { name: cityName, uf }, // opcionais, se você tiver
-  },
-  total,
-  items: itens.map(i => ({
-    rawDesc: i.description,
-    quantity: i.quantity,
-    unit: i.unit,
-    unitPrice: i.unitPrice,
-    total: i.total,
-  })),
-};
 
-const token = await auth.currentUser?.getIdToken(); // precisa estar logado
-if (!token) throw new Error('Faça login para enviar a nota.');
-
-await postReceipt(token, payload);
-/* ------------- entrypoint ------------- */
+/* ------------- FUNÇÃO QUE SUA TELA USA (mantida) ------------- */
 export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult> {
   const { html } = await fetchHtml(url);
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -233,4 +252,71 @@ export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult>
   if (gen) return gen;
 
   return { name: "Compra (NFC-e)", itens: [] };
+}
+
+/* ------------- OPÇÃO PARA SALVAR (sem quebrar a UI) ------------- */
+export async function parseNFCeWithMeta(url: string) {
+  const { html } = await fetchHtml(url);
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const parsed = parsePortalMG(doc) ?? parseGeneric(doc) ?? { itens: [] };
+
+  const uf = extractUF(url, doc) ?? "MG";
+  const accessKey = extractAccessKey(url, doc) ?? "0".repeat(44);
+  const store = extractStoreInfo(doc);
+
+  const meta: ReceiptMeta = {
+    accessKey,
+    issuedAtISO: (parsed.date ?? new Date()).toISOString(),
+    uf,
+    storeName: parsed.market ?? store.storeName ?? "Loja",
+    cnpj: store.cnpj,
+    cityName: store.cityName,
+    grandTotal: parsed.grandTotal,
+  };
+
+  return { parsed, meta };
+}
+
+export async function sendParsedReceiptToApi(meta: ReceiptMeta, parsed: ReceiptParseResult) {
+  const items = (parsed.itens || []).map((i) => {
+    const isPeso = !!i.unidade && /^(kg|g|l|ml)$/i.test(i.unidade);
+    const totalLinha = i.total ?? (isPeso ? i.preco : +(i.preco * i.quantidade).toFixed(2));
+    const unidade = i.unidade;
+
+    let unitPrice: number;
+    if (isPeso) {
+      const peso = i.peso && i.peso > 0 ? i.peso : 1;
+      unitPrice = +(totalLinha / peso).toFixed(2);
+    } else {
+      unitPrice = i.preco;
+    }
+
+    const quantity = isPeso ? 1 : i.quantidade;
+
+    return {
+      rawDesc: i.nome,
+      quantity,
+      unit: unidade,
+      unitPrice,
+      total: totalLinha,
+    };
+  });
+
+  const payload = {
+    accessKey: meta.accessKey,
+    issuedAt: meta.issuedAtISO,
+    uf: meta.uf,
+    store: {
+      name: meta.storeName,
+      cnpj: meta.cnpj,
+      city: meta.cityName ? { name: meta.cityName, uf: meta.uf } : undefined,
+    },
+    total: meta.grandTotal ?? items.reduce((s, it) => s + (it.total ?? 0), 0),
+    items,
+  };
+
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Faça login para enviar a nota.");
+
+  await postReceipt(token, payload);
 }
