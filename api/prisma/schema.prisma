@@ -1,0 +1,122 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id           // uid do Firebase
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  receipts  Receipt[]
+}
+
+model State {
+  id    Int    @id @default(autoincrement())
+  uf    String @unique
+  name  String
+  cities City[]
+}
+
+model City {
+  id      Int    @id @default(autoincrement())
+  name    String
+  stateId Int
+  state   State  @relation(fields: [stateId], references: [id])
+  stores  Store[]
+  @@unique([name, stateId])
+}
+
+model Address {
+  id        Int    @id @default(autoincrement())
+  street    String?
+  number    String?
+  district  String?
+  zipcode   String?
+  cityId    Int
+  city      City   @relation(fields: [cityId], references: [id])
+  stores    Store[]
+}
+
+model Store {
+  id         Int      @id @default(autoincrement())
+  name       String
+  cnpj       String?  @unique
+  addressId  Int?
+  address    Address? @relation(fields: [addressId], references: [id])
+  receipts   Receipt[]
+  priceHist  PriceHistory[]
+  @@index([name])
+}
+
+model Category {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
+  prods Product[]
+}
+
+model Product {
+  id           Int             @id @default(autoincrement())
+  canonical    String
+  gtin         String?         @unique
+  ncm          String?
+  categoryId   Int?
+  category     Category?       @relation(fields: [categoryId], references: [id])
+  aliases      ProductAlias[]
+  items        ReceiptItem[]
+  priceHist    PriceHistory[]
+  @@index([canonical])
+}
+
+model ProductAlias {
+  id        Int     @id @default(autoincrement())
+  alias     String  @unique // texto cru do cupom
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Receipt {
+  id         Int       @id @default(autoincrement())
+  accessKey  String    @unique // chave 44
+  issuedAt   DateTime
+  uf         String
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  storeId    Int?
+  store      Store?    @relation(fields: [storeId], references: [id])
+  total      Decimal
+  items      ReceiptItem[]
+  createdAt  DateTime  @default(now())
+  @@index([issuedAt])
+}
+
+model ReceiptItem {
+  id          Int      @id @default(autoincrement())
+  receiptId   Int
+  receipt     Receipt  @relation(fields: [receiptId], references: [id])
+  productId   Int?
+  product     Product? @relation(fields: [productId], references: [id])
+  rawDesc     String   // descrição crua do cupom
+  quantity    Decimal
+  unit        String?
+  unitPrice   Decimal
+  total       Decimal
+  @@index([rawDesc])
+}
+
+model PriceHistory {
+  id         Int      @id @default(autoincrement())
+  productId  Int?
+  product    Product? @relation(fields: [productId], references: [id])
+  storeId    Int?
+  store      Store?   @relation(fields: [storeId], references: [id])
+  price      Decimal
+  measuredAt DateTime // data da compra
+  receiptId  Int?
+  receipt    Receipt? @relation(fields: [receiptId], references: [id])
+  @@index([productId, storeId, measuredAt])
+}

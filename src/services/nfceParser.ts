@@ -1,5 +1,7 @@
 // src/services/nfceParser.ts
 import { T, numBR, parseQtyMG, unitMap, capFirst, stripCodigo } from "@/utils/nfce";
+import { postReceipt } from '@/services/api';
+import { auth } from '@/services/firebase';
 
 export type ReceiptItem = {
   nome: string;
@@ -82,6 +84,7 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     if (!isNaN(dt.getTime())) date = dt;
   }
 
+  
   // Totais (rodapé)
   const allText = T(doc.body);
   const mTotI = allText.match(/Qtde total de itens\s*[:\-]?\s*(\d+)/i);
@@ -195,7 +198,29 @@ function parseGeneric(doc: Document): ReceiptParseResult | null {
   if (!itens.length) return null;
   return { name: "Compra (NFC-e)", itens };
 }
+const payload = {
+  accessKey,               // string 44 dígitos
+  issuedAt,                // string ISO ex: new Date().toISOString()
+  uf,                      // "MG", "SP"...
+  store: {
+    name: storeName,
+    cnpj,                  // opcional
+    city: { name: cityName, uf }, // opcionais, se você tiver
+  },
+  total,
+  items: itens.map(i => ({
+    rawDesc: i.description,
+    quantity: i.quantity,
+    unit: i.unit,
+    unitPrice: i.unitPrice,
+    total: i.total,
+  })),
+};
 
+const token = await auth.currentUser?.getIdToken(); // precisa estar logado
+if (!token) throw new Error('Faça login para enviar a nota.');
+
+await postReceipt(token, payload);
 /* ------------- entrypoint ------------- */
 export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult> {
   const { html } = await fetchHtml(url);
