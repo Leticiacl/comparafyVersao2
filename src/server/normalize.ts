@@ -1,24 +1,27 @@
 // src/server/normalize.ts
-export function toSlug(s: string) {
-    return s
-      .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 120);
-  }
-  
-  // heurística simples para nome -> slug consistente (pode evoluir depois)
-  export function productSlugFromRaw(raw: string) {
-    let s = raw
-      .replace(/\b(qtde|quantidade|qtd|itens?:?).*$/i, '')
-      .replace(/\bvalor\s*total.*$/i, '')
-      .replace(/\(c[oó]digo:\s*\d+\)/i, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-  
-    // remove sufixos comuns
-    s = s.replace(/\b(un|u|und|unid|kg|g|l|ml|dz|bd)\b.*$/i, '').trim();
-    return toSlug(s);
-  }
-  
+export function slugify(s: string): string {
+  return String(s)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 80);
+}
+
+export function normalizeName(raw: string): { displayName: string; slug: string } {
+  let name = String(raw || '').trim();
+
+  // remove ruído típico de NFC-e
+  name = name.replace(/\b(qtde|qtd|quant|qtde total de itens)[: ]*[\d.,]+/gi, '');
+  name = name.replace(/\b\(c[oó]digo:\s*\d+\)/gi, '');
+  name = name.replace(/\s{2,}/g, ' ').trim();
+
+  // capitaliza leve
+  name = name
+    .toLowerCase()
+    .replace(/\b([a-zà-ú]{2,})/g, (m) => m[0].toUpperCase() + m.slice(1));
+
+  const slug = slugify(name);
+  return { displayName: name, slug };
+}

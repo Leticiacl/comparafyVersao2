@@ -1,58 +1,50 @@
 // src/server/enrich.ts
-import { prisma } from './db';
-import { productSlugFromRaw } from './normalize';
-import { searchOpenFoodFactsImages } from './sources/openfoodfacts';
-import { searchMercadoLivreImages } from './sources/mercadolivre';
+import { db } from './db';
+import { normalizeName } from './normalize';
+import { searchOFFImages } from './sources/openfoodfacts';
+import { searchMLImages } from './sources/mercadolivre';
 
-export async function findOrCreateProductFromRaw(rawDesc: string) {
-  const slug = productSlugFromRaw(rawDesc);
-  if (!slug) return null;
+export async function ensureProductWithImages(rawDesc: string) {
+  const raw = String(rawDesc || '').trim();
+  if (!raw) return null;
 
-  // tenta achar produto existente
-  let p = await prisma.product.findUnique({ where: { slug } });
-  if (p) return p;
+  const { displayName, slug } = normalizeName(raw);
 
-  // cria novo (displayName básico; refinamos depois)
-  p = await prisma.product.create({
-    data: {
-      slug,
-      displayName: rawDesc,
-    },
-  });
+  // tenta achar produto já existente
+  let product = await db.product.findUnique({ where: { slug } });
 
-  // busca imagens em paralelo (best-effort)
-  try {
-    const [off, ml] = await Promise.allSettled([
-      searchOpenFoodFactsImages(rawDesc),
-      searchMercadoLivreImages(rawDesc),
-    ]);
-
-    const imgs: { url: string; source: string }[] = [];
-
-    if (off.status === 'fulfilled') {
-      for (const im of off.value.slice(0, 3)) {
-        imgs.push({ url: im.url, source: 'openfoodfacts' });
-      }
-    }
-    if (ml.status === 'fulfilled' && imgs.length < 3) {
-      for (const im of ml.value.slice(0, 3 - imgs.length)) {
-        imgs.push({ url: im.url, source: 'mercadolivre' });
-      }
-    }
-
-    if (imgs.length) {
-      await prisma.productImage.createMany({
-        data: imgs.map((i) => ({
-          productId: p!.id,
-          url: i.url,
-          source: i.source,
-        })),
-        skipDuplicates: true,
-      });
-    }
-  } catch {
-    // silencioso — enriquecimento não bloqueia o fluxo
+  if (!product) {
+    product = await db.product.create({
+      data: {
+        slug,
+        displayName,
+        normalizedFrom: raw,
+      },
+    });
   }
 
-  return p;
+  // já tem imagens?
+  const existing = await db.productImage.count({ where: { productId: product.id } });
+  if (existing > 0) return product;
+
+  // busca imagens (OFF -> ML)
+  const off = await searchOFFImages(displayName);
+  const ml = await searchMLImages(displayName);
+  const all = [...off, ...ml].slice(0, 6);
+
+  if (all.length) {
+    await db.productImage.createMany({
+      data: all.map((img, i) => ({
+        productId: product!.id,
+        url: img.url,
+        source: img.source,
+        width: img.width ?? null,
+        height: img.height ?? null,
+        priority: i,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  return product;
 }

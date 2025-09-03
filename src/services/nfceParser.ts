@@ -13,34 +13,38 @@ export type ReceiptItem = {
   preco: number;     // preço unitário mostrado no app ou total (para peso)
   total?: number;    // total da linha (opcional)
 };
-
 export type ReceiptParseResult = {
   name?: string;
   market?: string;
   date?: Date;
   itens: ReceiptItem[];
-  totalItems?: number;   // “Qtde total de itens” (rodapé)
-  grandTotal?: number;   // “Valor total R$” (rodapé)
+  totalItems?: number;
+  grandTotal?: number;
 };
-
 export type ReceiptMeta = {
-  accessKey: string;       // 44 dígitos
-  issuedAtISO: string;     // ISO
-  uf: string;              // "MG", "SP", ...
+  accessKey: string;
+  issuedAtISO: string;
+  uf: string;
   storeName: string;
   cnpj?: string;
   cityName?: string;
   grandTotal?: number;
 };
 
-export type ParseWithMetaResult = {
-  parsed: ReceiptParseResult;
-  meta: ReceiptMeta;
-};
+/* ---------------- helpers ---------------- */
+const STOPWORDS = new Set(["de","do","da","dos","das","e","ou","para","com","em","no","na","nos","nas","un","kg","g","l","ml"]);
+const title = (s: string) =>
+  s.toLowerCase().split(/\s+/).map((w,i)=> i>0 && STOPWORDS.has(w)? w : w.replace(/^([a-zà-ú])/, m=>m.toUpperCase())).join(" ");
+function cleanName(raw: string) {
+  let s = String(raw || "");
+  s = s.replace(/\(c[oó]digo:\s*\d+\)/gi, "");
+  s = s.replace(/\b(qtde|qtd|quant(?:idade)?|qtde total de itens|itens)\s*[:\-]?\s*[\d.,]+/gi, "");
+  s = s.replace(/[|]/g, " ").replace(/\s{2,}/g, " ").trim();
+  return title(stripCodigo(s));
+}
 
-/* ---------------- fetch helpers ---------------- */
+/* ---------------- fetch ---------------- */
 const PROXY = ENV.NFCE_PROXY;
-
 async function fetchViaProxy(url: string): Promise<string | null> {
   try {
     const endpoint = PROXY.startsWith("http") ? PROXY : `${location.origin}${PROXY}`;
@@ -50,7 +54,6 @@ async function fetchViaProxy(url: string): Promise<string | null> {
     return typeof j?.html === "string" ? j.html : null;
   } catch { return null; }
 }
-
 async function fetchReadable(url: string): Promise<string | null> {
   try {
     const clean = url.replace(/^https?:\/\//, "");
@@ -58,67 +61,40 @@ async function fetchReadable(url: string): Promise<string | null> {
     return r.ok ? await r.text() : null;
   } catch { return null; }
 }
-
-async function fetchHtml(url: string): Promise<{ html: string; mode: string }> {
+async function fetchHtml(url: string): Promise<{ html: string; mode: "proxy"|"readable" }> {
   const p = await fetchViaProxy(url);
-  if (p) return { html: p, mode: "proxy" };
+  if (p) { console.debug("[nfce] via proxy"); return { html: p, mode: "proxy" }; }
   const r = await fetchReadable(url);
-  if (r) return { html: r, mode: "readable" };
+  if (r) { console.debug("[nfce] via readable"); return { html: r, mode: "readable" }; }
   throw new Error("nfce_fetch_failed");
 }
 
-/* ---------------- helpers de metadados ---------------- */
+/* ---------------- metadados ---------------- */
 function extractUF(url: string, doc: Document): string | undefined {
   if (/\.mg\.gov\.br/i.test(url)) return "MG";
   if (/\.sp\.gov\.br/i.test(url)) return "SP";
   if (/\.es\.gov\.br/i.test(url)) return "ES";
   const txt = doc.body?.textContent || "";
-  const m = txt.match(/\bUF[:\s-]*([A-Z]{2})\b/);
-  return m?.[1];
+  return txt.match(/\bUF[:\s-]*([A-Z]{2})\b/)?.[1];
 }
-
 function extractAccessKey(url: string, doc: Document): string | undefined {
-  const mUrl = url.match(/\b(\d{44})\b/);
-  if (mUrl) return mUrl[1];
-  const txt = doc.body?.textContent || "";
-  const mTxt = txt.match(/\b(\d{44})\b/);
-  return mTxt?.[1];
+  return url.match(/\b(\d{44})\b/)?.[1] || (doc.body?.textContent||"").match(/\b(\d{44})\b/)?.[1];
 }
-
-function extractStoreInfo(doc: Document): {
-  storeName?: string; cnpj?: string; cityName?: string;
-} {
+function extractStoreInfo(doc: Document) {
   const text = doc.body?.textContent || "";
   const findAfter = (re: RegExp) =>
     text.match(new RegExp(re.source + "\\s*[:\\-]?\\s*(.+)", re.flags))?.[1]?.split("\n")[0]?.trim();
-
   const storeName =
     (doc.querySelector("#spnNomeEmitente") as HTMLElement)?.innerText?.trim() ||
     findAfter(/Emitente|Raz[aã]o Social|Nome do Estabelecimento/i);
-
   const cnpj = (text.match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/) || [])[0];
-
   const cityName =
     (doc.querySelector("#spnMunicipio") as HTMLElement)?.innerText?.trim() ||
     findAfter(/Munic[ií]pio|Cidade/i);
-
   return { storeName, cnpj, cityName };
 }
 
-/* ---------------- limpeza básica do nome (ajuste fino ficará para depois) ---------------- */
-function cleanName(raw: string): string {
-  let s = raw.replace(/[\r\t]/g, " ").replace(/\s{2,}/g, " ").trim();
-  s = s.split(/qtde\s*total\s*de\s*i?tens/i)[0];
-  s = s.split(/valor\s+total/i)[0];
-  s = s.split(/\bun\s*:/i)[0];
-  s = s.replace(/\b(un|u|und|unid|kg|g|l|ml)\s*:?\s*[\d.,]+$/i, "");
-  s = s.replace(/[\s:|-]*[\d.,]+$/i, ""); // números soltos no fim
-  s = s.replace(/[:|,\-–—]+$/g, "").trim();
-  return capFirst(stripCodigo(s));
-}
-const unitMapLoose = (s?: string | null) => (s?.toLowerCase() === "u" ? "un" : unitMap(s || ""));
-
-/* ------------- parser MG por colunas ------------- */
+/* ---------------- parser MG (tabela) ---------------- */
 function parsePortalMG(doc: Document): ReceiptParseResult | null {
   const itens: ReceiptItem[] = [];
   let totalItems: number | undefined;
@@ -128,7 +104,6 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     T(doc.querySelector("#spnNomeEmitente")) ||
     T(doc.querySelector(".txtTopo, .txtTit, header")) || undefined;
 
-  // data (dd/mm/aaaa)
   let date: Date | undefined;
   const mDate = T(doc.body).match(/\b(\d{2}\/\d{2}\/\d{4})(?:\s+(\d{2}:\d{2}:\d{2}))?/);
   if (mDate) {
@@ -138,7 +113,6 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     if (!isNaN(dt.getTime())) date = dt;
   }
 
-  // Totais (rodapé)
   const allText = T(doc.body);
   const mTotI = allText.match(/Qtde total de itens\s*[:\-]?\s*(\d+)/i);
   const mTotV = allText.match(/Valor total R\$\s*[:\-]?\s*(?:R\$\s*)?([\d.,]+)/i);
@@ -154,22 +128,20 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     const joined = cells.join(" | ");
 
     if (/Qtde\s+total\s+de\s+itens/i.test(joined)) break;
-    if (/valor aproximado dos tributos|cliente:|seq\.?\s*cnc|forma de pagamento|valor pago r\$/i.test(joined))
-      continue;
+    if (/valor aproximado dos tributos|cliente:|seq\.?\s*cnc|forma de pagamento|valor pago r\$/i.test(joined)) continue;
     if (tds.length <= 2 && /^\s*R\$\s*[\d.,]+\s*$/i.test(joined)) continue;
     if (!/\(c[oó]digo:\s*\d+\)/i.test(joined)) continue;
 
     const firstCell = cells[0] || joined.split("|")[0] || "";
-    const nome = cleanName(firstCell.replace(/\(c[oó]digo:\s*\d+\)/i, ""));
-    if (!nome) continue;
+    let nome = cleanName(firstCell);
 
-    const qtdCell = cells.find((c) => /qtde\s*total\s*de\s*i?tens/i.test(c) || /\b(qtde|qtd|quant)\b/i.test(c));
+    const qtdCell = cells.find((c) => /qtde\s+total\s+de\s+i?tens/i.test(c) || /\b(qtde|qtd|quant)\b/i.test(c));
     const qtdStr = qtdCell ? qtdCell.replace(/.*?[:]\s*/i, "") : "";
     let quantidade = parseQtyMG(qtdStr);
 
     let unidade: string | undefined;
     const idxUn = cells.findIndex((c) => /^UN:?$/i.test(c) || /UN:\s*$/i.test(c) || /\b(kg|g|l|ml)\b/i.test(c));
-    if (idxUn >= 0 && cells[idxUn + 1]) unidade = unitMapLoose(cells[idxUn + 1]);
+    if (idxUn >= 0 && cells[idxUn + 1]) unidade = unitMap(cells[idxUn + 1]);
 
     let total = 0;
     const idxVal = cells.findIndex((c) => /valor\s+total\s+r\$/i.test(c) || /\bR\$\b/i.test(c));
@@ -183,7 +155,6 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
 
     let peso: number | undefined;
     let preco = 0;
-
     if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
       peso = quantidade;
       if (peso > 10 && /\b0\.\d{1,3}\b/.test(qtdStr)) peso = +(peso / 1000).toFixed(3);
@@ -193,6 +164,7 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
       preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
     }
 
+    if (!nome || (!preco && !total)) continue;
     itens.push({ nome, quantidade: Math.max(1, quantidade), unidade, peso, preco, total });
   }
 
@@ -200,33 +172,26 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
   return { name: "Compra (NFC-e)", market, date, itens, totalItems, grandTotal };
 }
 
-/* -------- fallback genérico por DOM -------- */
-function parseGenericDOM(doc: Document): ReceiptParseResult | null {
+/* ---------------- genérico tabela ---------------- */
+function parseGenericTable(doc: Document): ReceiptParseResult | null {
   const itens: ReceiptItem[] = [];
   const rows = Array.from(doc.querySelectorAll("tr"));
-
   for (const tr of rows) {
     const cells = Array.from(tr.querySelectorAll("td")).map(T);
     const line = cells.join(" | ");
-
     if (/Qtde\s+total\s+de\s+itens/i.test(line)) break;
     if (/valor aproximado dos tributos|cliente:|seq\.?\s*cnc|forma de pagamento|valor pago r\$/i.test(line)) continue;
     if (cells.length <= 2 && /^\s*R\$\s*[\d.,]+\s*$/i.test(line)) continue;
     if (!/\(c[oó]digo:\s*\d+\)/i.test(line)) continue;
     if (!/R\$\s*[\d.,]+/i.test(line)) continue;
 
-    const nome = cleanName(cells[0] || line.split(/\(c[oó]digo:\s*\d+\)/i)[0] || "");
-    if (!nome) continue;
-
-    const qtd1 = line.match(/(?:qtde|qtd|quant|itens:?)\s*[: ]\s*([\d.,]+)/i);
-    const qtd2 = line.match(/([\d.,]+)\s*(kg|g|l|ml|un|u|und|unid|bd|dz)\b/i);
-    const mQtd = qtd1 || qtd2;
-    let quantidade = mQtd ? parseQtyMG(mQtd[1]) : 1;
-
-    const unidade = (qtd2?.[2] && unitMapLoose(qtd2[2])) ||
-      unitMapLoose(line.match(/\b(un|u|und|unid|kg|g|l|ml|bd|dz|fr)\b/i)?.[1]);
-
+    let nome = cleanName((cells[0] || line.split(/\(c[oó]digo:\s*\d+\)/i)[0] || ""));
+    const mQtd = line.match(/(qtde|qtd|quant|itens:\s*)([\d.,]+)/i);
+    const mUn  = line.match(/\b(un|und|unid|kg|g|l|ml|bd|dz|fr)\b/i);
     const mVal = line.match(/R\$\s*([\d.,]+)/i);
+
+    let quantidade = mQtd ? parseQtyMG(mQtd[2]) : 1;
+    let unidade = unitMap(mUn?.[1]);
     const total = mVal ? numBR(mVal[1]) : 0;
     if (!total) continue;
 
@@ -238,96 +203,71 @@ function parseGenericDOM(doc: Document): ReceiptParseResult | null {
     let peso: number | undefined;
     let preco = 0;
     if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
-      peso = quantidade;
-      quantidade = 1;
-      preco = total;
+      peso = quantidade; quantidade = 1; preco = total;
     } else {
       preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
     }
 
     itens.push({ nome, quantidade, unidade, peso, preco, total });
   }
-
   if (!itens.length) return null;
   return { name: "Compra (NFC-e)", itens };
 }
 
-/* -------- fallback genérico por texto -------- */
-function parseGenericTEXT(doc: Document): ReceiptParseResult | null {
-  const txt = (doc.body?.innerText || "").replace(/\t/g, " ").replace(/\r/g, "");
-  const linhas = txt.split(/\n+/).map(s => s.trim()).filter(Boolean);
+/* ---------------- parser TEXTO ---------------- */
+function parseFromPlainText(doc: Document): ReceiptParseResult | null {
+  const txt = (doc.body?.textContent || "").replace(/\u00a0/g, " ");
+  if (!txt || txt.length < 200) return null;
 
   const itens: ReceiptItem[] = [];
-
-  for (let i = 0; i < linhas.length; i++) {
-    const line = linhas[i];
-    if (!/\(c[oó]digo:\s*\d+\)/i.test(line)) continue;
-
-    const nome = cleanName(line.replace(/\(c[oó]digo:\s*\d+\)/i, ""));
+  const re = /([^\n]+?)\s*(?:qtde|qtd|quant(?:idade)?|itens?)?[:\s-]*([\d.,]+)?\s*(un|und|unid|kg|g|l|ml|bd|dz)?[^\n]*?\bvalor\s+total\s*r?\$?\s*([\d.,]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(txt))) {
+    const nome = cleanName(m[1] || "");
     if (!nome) continue;
-
-    const windowLines = [linhas[i], linhas[i+1], linhas[i+2], linhas[i+3]]
-      .filter(Boolean).join(" | ");
-
-    const mVal = windowLines.match(/R\$\s*([\d.,]+)/i);
-    const total = mVal ? numBR(mVal[1]) : 0;
+    let quantidade = m[2] ? parseQtyMG(m[2]) : 1;
+    const unidade = unitMap(m[3] || "");
+    const total = numBR(m[4] || "0");
     if (!total) continue;
 
-    const qtd1 = windowLines.match(/(?:qtde|qtd|quant|itens:?)\s*[: ]\s*([\d.,]+)/i);
-    const qtd2 = windowLines.match(/([\d.,]+)\s*(kg|g|l|ml|un|u|und|unid|bd|dz)\b/i);
-    const mQtd = qtd1 || qtd2;
-    let quantidade = mQtd ? parseQtyMG(mQtd[1]) : 1;
-
-    const unidade = unitMapLoose(qtd2?.[2]) ||
-      unitMapLoose(windowLines.match(/\b(un|u|und|unid|kg|g|l|ml|bd|dz|fr)\b/i)?.[1]);
-
-    if (unidade && /^(un|bd|dz)$/i.test(unidade)) {
-      quantidade = Math.round(quantidade);
-      while (quantidade >= 1000 && quantidade % 1000 === 0) quantidade /= 1000;
-    }
+    if (unidade && /^(un|bd|dz)$/i.test(unidade)) quantidade = Math.max(1, Math.round(quantidade));
 
     let peso: number | undefined;
     let preco = 0;
-    if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
-      peso = quantidade;
-      quantidade = 1;
-      preco = total;
-    } else {
-      preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
-    }
+    if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) { peso = quantidade; quantidade = 1; preco = total; }
+    else { preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total; }
 
     itens.push({ nome, quantidade, unidade, peso, preco, total });
   }
 
+  let totalItems: number | undefined;
+  let grandTotal: number | undefined;
+  const mTotI = txt.match(/Qtde\s*total\s*de\s*itens\s*[:\-]?\s*(\d+)/i);
+  const mTotV = txt.match(/Valor\s*total\s*R\$\s*[:\-]?\s*(?:R\$\s*)?([\d.,]+)/i);
+  if (mTotI) totalItems = Number(mTotI[1]);
+  if (mTotV) grandTotal = numBR(mTotV[1]);
+
   if (!itens.length) return null;
-  return { name: "Compra (NFC-e)", itens };
+  return { name: "Compra (NFC-e)", itens, totalItems, grandTotal };
 }
 
-/* ------------- FUNÇÕES PÚBLICAS ------------- */
+/* ------------- FUNÇÃO USADA PELA TELA ------------- */
 export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult> {
   const { html } = await fetchHtml(url);
   const doc = new DOMParser().parseFromString(html, "text/html");
-
-  const mg = parsePortalMG(doc);
-  if (mg) return mg;
-
-  const genDom = parseGenericDOM(doc);
-  if (genDom) return genDom;
-
-  const genText = parseGenericTEXT(doc);
-  if (genText) return genText;
-
-  return { name: "Compra (NFC-e)", itens: [] };
+  return (
+    parsePortalMG(doc) ??
+    parseGenericTable(doc) ??
+    parseFromPlainText(doc) ??
+    { name: "Compra (NFC-e)", itens: [] }
+  );
 }
 
-export async function parseNFCeWithMeta(url: string): Promise<ParseWithMetaResult> {
+/* ------------- with meta / envio (opcional) ------------- */
+export async function parseNFCeWithMeta(url: string) {
   const { html } = await fetchHtml(url);
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const parsed =
-    parsePortalMG(doc) ??
-    parseGenericDOM(doc) ??
-    parseGenericTEXT(doc) ??
-    { itens: [] };
+  const parsed = parsePortalMG(doc) ?? parseGenericTable(doc) ?? parseFromPlainText(doc) ?? { itens: [] };
 
   const uf = extractUF(url, doc) ?? "MG";
   const accessKey = extractAccessKey(url, doc) ?? "0".repeat(44);
@@ -342,11 +282,9 @@ export async function parseNFCeWithMeta(url: string): Promise<ParseWithMetaResul
     cityName: store.cityName,
     grandTotal: parsed.grandTotal,
   };
-
   return { parsed, meta };
 }
 
-/* ------------- ENVIO PARA A API ------------- */
 export async function sendParsedReceiptToApi(meta: ReceiptMeta, parsed: ReceiptParseResult) {
   const items = (parsed.itens || []).map((i) => {
     const isPeso = !!i.unidade && /^(kg|g|l|ml)$/i.test(i.unidade);
@@ -357,36 +295,22 @@ export async function sendParsedReceiptToApi(meta: ReceiptMeta, parsed: ReceiptP
     if (isPeso) {
       const peso = i.peso && i.peso > 0 ? i.peso : 1;
       unitPrice = +(totalLinha / peso).toFixed(2);
-    } else {
-      unitPrice = i.preco;
-    }
-
+    } else { unitPrice = i.preco; }
     const quantity = isPeso ? 1 : i.quantidade;
 
-    return {
-      rawDesc: i.nome,
-      quantity,
-      unit: unidade,
-      unitPrice,
-      total: totalLinha,
-    };
+    return { rawDesc: i.nome, quantity, unit: unidade, unitPrice, total: totalLinha };
   });
 
   const payload = {
     accessKey: meta.accessKey,
     issuedAt: meta.issuedAtISO,
     uf: meta.uf,
-    store: {
-      name: meta.storeName,
-      cnpj: meta.cnpj,
-      city: meta.cityName ? { name: meta.cityName, uf: meta.uf } : undefined,
-    },
+    store: { name: meta.storeName, cnpj: meta.cnpj, city: meta.cityName ? { name: meta.cityName, uf: meta.uf } : undefined },
     total: meta.grandTotal ?? items.reduce((s, it) => s + (it.total ?? 0), 0),
     items,
   };
 
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Faça login para enviar a nota.");
-
   await postReceipt(token, payload);
 }

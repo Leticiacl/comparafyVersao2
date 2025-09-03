@@ -1,23 +1,20 @@
 // src/server/sources/mercadolivre.ts
-// Usa a busca pública do Mercado Livre (sem chave) para pegar thumbnails.
-// Importante: apenas como fallback, respeitando ToS (não armazenamos conteúdo, só URL).
-export type MLImage = { url: string; width?: number; height?: number };
+export type ImageHit = { url: string; width?: number; height?: number; source: 'ml' };
 
-export async function searchMercadoLivreImages(query: string): Promise<MLImage[]> {
-  const u = new URL('https://api.mercadolibre.com/sites/MLB/search');
-  u.searchParams.set('q', query);
-  u.searchParams.set('limit', '4');
-
-  const r = await fetch(u.toString(), { headers: { 'Accept': 'application/json' } });
-  if (!r.ok) return [];
-  const j = await r.json().catch(() => null);
-  if (!j?.results?.length) return [];
-
-  return j.results
-    .map((it: any) => {
+export async function searchMLImages(q: string): Promise<ImageHit[]> {
+  try {
+    const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(q)}&limit=5`;
+    const r = await fetch(url, { method: 'GET' });
+    if (!r.ok) return [];
+    const j = await r.json();
+    const results: any[] = Array.isArray(j?.results) ? j.results : [];
+    const imgs: ImageHit[] = [];
+    for (const it of results) {
       const thumb: string | undefined = it?.thumbnail || it?.thumbnail_id;
-      if (!thumb) return null;
-      return { url: String(thumb) };
-    })
-    .filter(Boolean) as MLImage[];
+      if (thumb && typeof thumb === 'string') imgs.push({ url: thumb, source: 'ml' });
+    }
+    return imgs;
+  } catch {
+    return [];
+  }
 }

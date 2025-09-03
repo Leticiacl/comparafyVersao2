@@ -1,14 +1,94 @@
 // src/pages/PurchaseDetail.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Menu, Dialog } from "@headlessui/react";
-import { ArrowLeftIcon, EllipsisVerticalIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowLeftIcon,
+  EllipsisVerticalIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 import BottomNav from "@/components/BottomNav";
-import PurchaseItemModal, { PurchaseExtraItem as PurchaseItem } from "@/components/PurchaseItemModal";
+import PurchaseItemModal, {
+  PurchaseExtraItem as PurchaseItem,
+} from "@/components/PurchaseItemModal";
 import { useData } from "@/context/DataContext";
 import { anyToISODate, isoToDisplay } from "@/utils/date";
 import { formatBRL, computePurchaseTotal } from "@/utils/price";
 
+/* -------- limpeza de nome (mesma regra do parser) -------- */
+const STOPWORDS = new Set([
+  "de","do","da","dos","das","e","ou","para","com","em",
+  "no","na","nos","nas","kg","g","l","ml","bd","dz","un"
+]);
+function toTitle(s: string) {
+  return s
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w, i) => (i > 0 && STOPWORDS.has(w) ? w : w.replace(/^([a-zà-ú])/, (m) => m.toUpperCase())))
+    .join(" ");
+}
+function cleanItemName(raw: string): string {
+  if (!raw) return "";
+  let s = String(raw).replace(/\s+/g, " ");
+  s = s.replace(/\(c[oó]digo:\s*\d+\)/gi, "");
+  s = s.replace(/\b(qtde|qtd|quant(?:idade)?|qtde total de itens|itens)\s*[:\-]?\s*[\d.,]+/gi, "");
+  s = s.replace(/\s+(\d+(?:[.,]\d+)?)\s*$/g, "");
+  s = s.replace(/[|]/g, " ").replace(/\s{2,}/g, " ").trim();
+  s = s.replace(/\bun[:.]?\s*$/i, "").trim();
+  return toTitle(s);
+}
+
+/* -------- mini-resolvedor de imagens (Open Food Facts) -------- */
+const thumbCache = new Map<string, string | null>();
+
+function useProductThumb(name: string | undefined) {
+  const [url, setUrl] = useState<string | null>(null);
+  const key = (name || "").toLowerCase().trim();
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    const cached = thumbCache.get(key);
+    if (cached !== undefined) { setUrl(cached); return; }
+
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    (async () => {
+      try {
+        // tenta achar 1 imagem pelo nome (resultado rápido)
+        const q = encodeURIComponent(key);
+        const res = await fetch(
+          `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=1`,
+          { signal: ac.signal }
+        );
+        let found: string | null = null;
+        if (res.ok) {
+          const j = await res.json();
+          const prod = j?.products?.[0];
+          found =
+            prod?.image_front_thumb_url ||
+            prod?.image_front_small_url ||
+            prod?.image_front_url ||
+            null;
+        }
+        thumbCache.set(key, found);
+        setUrl(found);
+      } catch {
+        thumbCache.set(key, null);
+        setUrl(null);
+      }
+    })();
+
+    return () => ac.abort();
+  }, [key]);
+
+  return url;
+}
+
+/* -------- helpers -------- */
 function dateOnlyDisplay(any: any): string {
   const iso = anyToISODate(
     typeof any === "number" ? any : any?.seconds ? any.seconds * 1000 : any
@@ -134,39 +214,54 @@ export default function PurchaseDetail() {
           const linhaTotal =
             (typeof it.total === "number" && it.total) ||
             (Number(it.preco) || 0) * (Number(it.quantidade) || 1);
+
+          const name = cleanItemName(it.nome || it.name || "");
+          // se o item já tiver imagem vinda do backend, usa; senão tenta OFF
+          const localThumb =
+            it.img || it.image || it.product?.images?.[0]?.url || it.images?.[0]?.url || null;
+          const offThumb = useProductThumb(localThumb ? undefined : name);
+          const thumb = localThumb || offThumb;
+
           return (
             <div key={i} className="flex items-start justify-between border-b border-gray-100 p-4 last:border-b-0">
-              <div>
-                <div className="font-medium text-gray-900">{it.nome || it.name}</div>
-                <div className="text-sm text-gray-500">
-                  {Number(it.quantidade) || 1}× · {it.unidade || "un"} {it.peso ? `· ${it.peso}` : ""}
-                </div>
-                <div className="text-sm text-gray-500">UN. {formatBRL(it.preco)}</div>
-
-                {canAddItems && (
-                  <div className="mt-2 flex items-center gap-4 text-sm">
-                    <button
-                      className="flex items-center gap-1 text-gray-700 hover:underline"
-                      onClick={() =>
-                        setEdit({
-                          index: i,
-                          nome: it.nome,
-                          quantidade: Number(it.quantidade) || 1,
-                          unidade: it.unidade || "un",
-                          preco: Number(it.preco) || 0,
-                        })
-                      }
-                    >
-                      <PencilSquareIcon className="h-4 w-4" /> Editar
-                    </button>
-                    <button
-                      className="flex items-center gap-1 text-red-600 hover:underline"
-                      onClick={() => deletePurchaseItemInContext(p.id, i)}
-                    >
-                      <TrashIcon className="h-4 w-4" /> Excluir
-                    </button>
-                  </div>
+              <div className="flex items-start gap-3">
+                {thumb ? (
+                  <img src={thumb} alt={name} className="mt-0.5 h-12 w-12 rounded-lg object-cover" />
+                ) : (
+                  <div className="mt-0.5 h-12 w-12 rounded-lg bg-gray-100" />
                 )}
+                <div>
+                  <div className="font-medium text-gray-900">{name}</div>
+                  <div className="text-sm text-gray-500">
+                    {Number(it.quantidade) || 1}× · {it.unidade || "un"} {it.peso ? `· ${it.peso}` : ""}
+                  </div>
+                  <div className="text-sm text-gray-500">UN. {formatBRL(it.preco || 0)}</div>
+
+                  {canAddItems && (
+                    <div className="mt-2 flex items-center gap-4 text-sm">
+                      <button
+                        className="flex items-center gap-1 text-gray-700 hover:underline"
+                        onClick={() =>
+                          setEdit({
+                            index: i,
+                            nome: name,
+                            quantidade: Number(it.quantidade) || 1,
+                            unidade: it.unidade || "un",
+                            preco: Number(it.preco) || 0,
+                          })
+                        }
+                      >
+                        <PencilSquareIcon className="h-4 w-4" /> Editar
+                      </button>
+                      <button
+                        className="flex items-center gap-1 text-red-600 hover:underline"
+                        onClick={() => deletePurchaseItemInContext(p.id, i)}
+                      >
+                        <TrashIcon className="h-4 w-4" /> Excluir
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="text-right font-semibold text-gray-900">{formatBRL(linhaTotal)}</div>
@@ -189,7 +284,7 @@ export default function PurchaseDetail() {
         onClose={() => setAddOpen(false)}
         onConfirm={async (item) => {
           const payload: PurchaseItem = {
-            nome: item.nome,
+            nome: cleanItemName(item.nome),
             quantidade: item.quantidade ?? 1,
             unidade: item.unidade ?? "un",
             preco: Number(item.preco || 0),
@@ -213,7 +308,11 @@ export default function PurchaseDetail() {
               <div className="space-y-3">
                 <div>
                   <div className="mb-1 text-sm font-medium">Nome</div>
-                  <input className="w-full rounded-lg border px-3 py-2" value={edit.nome} onChange={(e) => setEdit({ ...edit, nome: e.target.value })} />
+                  <input
+                    className="w-full rounded-lg border px-3 py-2"
+                    value={edit.nome}
+                    onChange={(e) => setEdit({ ...edit, nome: e.target.value })}
+                  />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
@@ -226,13 +325,18 @@ export default function PurchaseDetail() {
                   </div>
                   <div>
                     <div className="mb-1 text-sm font-medium">Unidade</div>
-                    <input className="w-full rounded-lg border px-3 py-2" value={edit.unidade} onChange={(e) => setEdit({ ...edit, unidade: e.target.value })} />
+                    <input
+                      className="w-full rounded-lg border px-3 py-2"
+                      value={edit.unidade}
+                      onChange={(e) => setEdit({ ...edit, unidade: e.target.value })}
+                    />
                   </div>
                   <div>
                     <div className="mb-1 text-sm font-medium">Preço</div>
                     <input
                       type="number" step="0.01" className="w-full rounded-lg border px-3 py-2"
-                      value={edit.preco} onChange={(e) => setEdit({ ...edit, preco: Number(e.target.value || 0) })}
+                      value={edit.preco}
+                      onChange={(e) => setEdit({ ...edit, preco: Number(e.target.value || 0) })}
                     />
                   </div>
                 </div>
@@ -244,7 +348,10 @@ export default function PurchaseDetail() {
                     onClick={async () => {
                       if (!edit) return;
                       await updatePurchaseItemInContext(p.id, edit.index, {
-                        nome: edit.nome, quantidade: edit.quantidade, unidade: edit.unidade, preco: edit.preco,
+                        nome: cleanItemName(edit.nome),
+                        quantidade: edit.quantidade,
+                        unidade: edit.unidade,
+                        preco: edit.preco,
                       });
                       setEdit(null);
                     }}
