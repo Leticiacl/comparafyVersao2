@@ -1,58 +1,86 @@
-// api/nfce-proxy.ts
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+// /api/nfce-proxy.ts
+// Proxy simples para contornar CORS ao buscar páginas públicas da NFC-e.
+// Uso:  GET /api/nfce-proxy?url=<URL da NFC-e>
+// Obs.: configure no frontend: VITE_NFCE_PROXY=/api/nfce-proxy e VITE_FORCE_PROXY=1
 
-const ALLOWED = [
-  // maioria dos portais estaduais
-  /sefaz/i, /fazenda/i, /fazenda\./i, /nfe/i, /nfce/i, /fisco/i,
-  // alguns proxies legíveis (fallbacks)
-  /jina\.ai/i,
-];
+export const config = { runtime: "edge" }; // Vercel Edge
 
-function isAllowed(url: string) {
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+  "Cache-Control": "no-store",
+  "Content-Type": "application/json; charset=utf-8",
+} as const;
+
+// --- util: resposta JSON com CORS
+function json(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), { status, headers: CORS_HEADERS });
+}
+
+// --- util: valida URL segura (apenas http/https)
+function toSafeUrl(raw: string | null): URL | null {
+  if (!raw) return null;
   try {
-    const u = new URL(url);
-    const host = u.host.toLowerCase();
-    return ALLOWED.some((rx) => rx.test(host));
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
+// --- handler
+export default async function handler(req: Request) {
+  // Pré-flight CORS
   if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
-  const target = (req.query.url as string) || "";
-  if (!target || !/^https?:\/\//i.test(target) || !isAllowed(target)) {
-    res.status(400).json({ error: "missing_or_invalid_url" });
-    return;
+  if (req.method !== "GET") {
+    return json(405, { error: "Method not allowed" });
   }
+
+  const { searchParams } = new URL(req.url);
+  const targetUrl = toSafeUrl(searchParams.get("url"));
+  if (!targetUrl) {
+    return json(400, { error: "missing_or_invalid_url" });
+  }
+
+  // Timeout para evitar pendurar função edge
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15s
 
   try {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 10000); // 10s timeout
-
-    const r = await fetch(target, {
+    const r = await fetch(targetUrl.toString(), {
+      method: "GET",
       redirect: "follow",
-      signal: ctl.signal,
+      // Nunca envia credenciais/cookies
+      credentials: "omit",
+      signal: controller.signal,
       headers: {
-        "user-agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        // Alguns portais exigem UA "de navegador"
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
-    clearTimeout(t);
+
+    if (!r.ok) {
+      return json(502, { error: "upstream_error", status: r.status });
+    }
 
     const html = await r.text();
-    res.status(200).json({ html, status: r.status, finalUrl: r.url });
+
+    // Devolve HTML dentro de JSON (evita problemas de MIME/CORS no front)
+    return json(200, { html, source: targetUrl.hostname });
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || "fetch_failed" });
+    // AbortError vira "timeout"
+    const error =
+      e?.name === "AbortError" ? "timeout" : e?.message || "proxy_failed";
+    return json(500, { error });
+  } finally {
+    clearTimeout(timeout);
   }
 }

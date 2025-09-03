@@ -2,6 +2,7 @@
 import { T, numBR, parseQtyMG, unitMap, capFirst, stripCodigo } from "@/utils/nfce";
 import { postReceipt } from "@/services/api";
 import { auth } from "@/services/firebase";
+import { ENV } from "@/env";
 
 /* ---------------- tipos ---------------- */
 export type ReceiptItem = {
@@ -32,9 +33,13 @@ export type ReceiptMeta = {
   grandTotal?: number;
 };
 
+export type ParseWithMetaResult = {
+  parsed: ReceiptParseResult;
+  meta: ReceiptMeta;
+};
+
 /* ---------------- fetch helpers ---------------- */
-const PROXY = (import.meta as any).env?.VITE_NFCE_PROXY || "/api/nfce-proxy";
-const FORCE_PROXY = ((import.meta as any).env?.VITE_FORCE_PROXY || "0") === "1";
+const PROXY = ENV.NFCE_PROXY;
 
 async function fetchViaProxy(url: string): Promise<string | null> {
   try {
@@ -45,12 +50,7 @@ async function fetchViaProxy(url: string): Promise<string | null> {
     return typeof j?.html === "string" ? j.html : null;
   } catch { return null; }
 }
-async function fetchDirect(url: string): Promise<string | null> {
-  try {
-    const r = await fetch(url, { credentials: "omit" });
-    return r.ok ? await r.text() : null;
-  } catch { return null; }
-}
+
 async function fetchReadable(url: string): Promise<string | null> {
   try {
     const clean = url.replace(/^https?:\/\//, "");
@@ -58,16 +58,8 @@ async function fetchReadable(url: string): Promise<string | null> {
     return r.ok ? await r.text() : null;
   } catch { return null; }
 }
+
 async function fetchHtml(url: string): Promise<{ html: string; mode: string }> {
-  if (FORCE_PROXY) {
-    const p = await fetchViaProxy(url);
-    if (p) return { html: p, mode: "proxy" };
-    const r = await fetchReadable(url);
-    if (r) return { html: r, mode: "readable" };
-    throw new Error("nfce_fetch_failed");
-  }
-  const d = await fetchDirect(url);
-  if (d) return { html: d, mode: "direct" };
   const p = await fetchViaProxy(url);
   if (p) return { html: p, mode: "proxy" };
   const r = await fetchReadable(url);
@@ -84,6 +76,7 @@ function extractUF(url: string, doc: Document): string | undefined {
   const m = txt.match(/\bUF[:\s-]*([A-Z]{2})\b/);
   return m?.[1];
 }
+
 function extractAccessKey(url: string, doc: Document): string | undefined {
   const mUrl = url.match(/\b(\d{44})\b/);
   if (mUrl) return mUrl[1];
@@ -91,20 +84,39 @@ function extractAccessKey(url: string, doc: Document): string | undefined {
   const mTxt = txt.match(/\b(\d{44})\b/);
   return mTxt?.[1];
 }
+
 function extractStoreInfo(doc: Document): {
   storeName?: string; cnpj?: string; cityName?: string;
 } {
   const text = doc.body?.textContent || "";
   const findAfter = (re: RegExp) =>
     text.match(new RegExp(re.source + "\\s*[:\\-]?\\s*(.+)", re.flags))?.[1]?.split("\n")[0]?.trim();
+
   const storeName =
     (doc.querySelector("#spnNomeEmitente") as HTMLElement)?.innerText?.trim() ||
     findAfter(/Emitente|Raz[aã]o Social|Nome do Estabelecimento/i);
+
   const cnpj = (text.match(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/) || [])[0];
-  const cityName = findAfter(/Munic[ií]pio|Cidade/i) ||
-    (doc.querySelector("#spnMunicipio") as HTMLElement)?.innerText?.trim();
+
+  const cityName =
+    (doc.querySelector("#spnMunicipio") as HTMLElement)?.innerText?.trim() ||
+    findAfter(/Munic[ií]pio|Cidade/i);
+
   return { storeName, cnpj, cityName };
 }
+
+/* ---------------- limpeza básica do nome (ajuste fino ficará para depois) ---------------- */
+function cleanName(raw: string): string {
+  let s = raw.replace(/[\r\t]/g, " ").replace(/\s{2,}/g, " ").trim();
+  s = s.split(/qtde\s*total\s*de\s*i?tens/i)[0];
+  s = s.split(/valor\s+total/i)[0];
+  s = s.split(/\bun\s*:/i)[0];
+  s = s.replace(/\b(un|u|und|unid|kg|g|l|ml)\s*:?\s*[\d.,]+$/i, "");
+  s = s.replace(/[\s:|-]*[\d.,]+$/i, ""); // números soltos no fim
+  s = s.replace(/[:|,\-–—]+$/g, "").trim();
+  return capFirst(stripCodigo(s));
+}
+const unitMapLoose = (s?: string | null) => (s?.toLowerCase() === "u" ? "un" : unitMap(s || ""));
 
 /* ------------- parser MG por colunas ------------- */
 function parsePortalMG(doc: Document): ReceiptParseResult | null {
@@ -148,25 +160,23 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     if (!/\(c[oó]digo:\s*\d+\)/i.test(joined)) continue;
 
     const firstCell = cells[0] || joined.split("|")[0] || "";
-    let nome = firstCell.replace(/\(c[oó]digo:\s*\d+\)/i, "");
-    nome = capFirst(stripCodigo(nome));
+    const nome = cleanName(firstCell.replace(/\(c[oó]digo:\s*\d+\)/i, ""));
+    if (!nome) continue;
 
-    const qtdCell = cells.find((c) => /qtde\s+total\s+de\s+i?tens/i.test(c));
+    const qtdCell = cells.find((c) => /qtde\s*total\s*de\s*i?tens/i.test(c) || /\b(qtde|qtd|quant)\b/i.test(c));
     const qtdStr = qtdCell ? qtdCell.replace(/.*?[:]\s*/i, "") : "";
     let quantidade = parseQtyMG(qtdStr);
 
     let unidade: string | undefined;
-    const idxUn = cells.findIndex((c) => /^UN:?$/i.test(c) || /UN:\s*$/i.test(c));
-    if (idxUn >= 0 && cells[idxUn + 1]) unidade = unitMap(cells[idxUn + 1]);
+    const idxUn = cells.findIndex((c) => /^UN:?$/i.test(c) || /UN:\s*$/i.test(c) || /\b(kg|g|l|ml)\b/i.test(c));
+    if (idxUn >= 0 && cells[idxUn + 1]) unidade = unitMapLoose(cells[idxUn + 1]);
 
     let total = 0;
-    const idxVal = cells.findIndex((c) => /valor\s+total\s+r\$/i.test(c));
-    if (idxVal >= 0 && cells[idxVal + 1]) {
-      total = numBR(cells[idxVal + 1].replace(/^R\$\s*/i, ""));
-    }
+    const idxVal = cells.findIndex((c) => /valor\s+total\s+r\$/i.test(c) || /\bR\$\b/i.test(c));
+    if (idxVal >= 0 && cells[idxVal + 1]) total = numBR(cells[idxVal + 1].replace(/^R\$\s*/i, ""));
     if (!total) continue;
 
-    if (unidade && /^(un|bd|dz)$/.test(unidade)) {
+    if (unidade && /^(un|bd|dz)$/i.test(unidade)) {
       quantidade = Math.round(quantidade);
       while (quantidade >= 1000 && quantidade % 1000 === 0) quantidade /= 1000;
     }
@@ -174,7 +184,7 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     let peso: number | undefined;
     let preco = 0;
 
-    if (unidade && /^(kg|g|l|ml)$/.test(unidade)) {
+    if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
       peso = quantidade;
       if (peso > 10 && /\b0\.\d{1,3}\b/.test(qtdStr)) peso = +(peso / 1000).toFixed(3);
       quantidade = 1;
@@ -183,8 +193,6 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
       preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
     }
 
-    if (!nome || (!preco && !total)) continue;
-
     itens.push({ nome, quantidade: Math.max(1, quantidade), unidade, peso, preco, total });
   }
 
@@ -192,10 +200,11 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
   return { name: "Compra (NFC-e)", market, date, itens, totalItems, grandTotal };
 }
 
-/* -------- fallback genérico -------- */
-function parseGeneric(doc: Document): ReceiptParseResult | null {
+/* -------- fallback genérico por DOM -------- */
+function parseGenericDOM(doc: Document): ReceiptParseResult | null {
   const itens: ReceiptItem[] = [];
   const rows = Array.from(doc.querySelectorAll("tr"));
+
   for (const tr of rows) {
     const cells = Array.from(tr.querySelectorAll("td")).map(T);
     const line = cells.join(" | ");
@@ -206,25 +215,29 @@ function parseGeneric(doc: Document): ReceiptParseResult | null {
     if (!/\(c[oó]digo:\s*\d+\)/i.test(line)) continue;
     if (!/R\$\s*[\d.,]+/i.test(line)) continue;
 
-    let nome = capFirst(stripCodigo((cells[0] || line.split(/\(c[oó]digo:\s*\d+\)/i)[0] || "")));
+    const nome = cleanName(cells[0] || line.split(/\(c[oó]digo:\s*\d+\)/i)[0] || "");
+    if (!nome) continue;
 
-    const mQtd = line.match(/(qtde|qtd|quant|itens:\s*)([\d.,]+)/i);
-    const mUn  = line.match(/\b(un|und|unid|kg|g|l|ml|bd|dz|fr)\b/i);
+    const qtd1 = line.match(/(?:qtde|qtd|quant|itens:?)\s*[: ]\s*([\d.,]+)/i);
+    const qtd2 = line.match(/([\d.,]+)\s*(kg|g|l|ml|un|u|und|unid|bd|dz)\b/i);
+    const mQtd = qtd1 || qtd2;
+    let quantidade = mQtd ? parseQtyMG(mQtd[1]) : 1;
+
+    const unidade = (qtd2?.[2] && unitMapLoose(qtd2[2])) ||
+      unitMapLoose(line.match(/\b(un|u|und|unid|kg|g|l|ml|bd|dz|fr)\b/i)?.[1]);
+
     const mVal = line.match(/R\$\s*([\d.,]+)/i);
-
-    let quantidade = mQtd ? parseQtyMG(mQtd[2]) : 1;
-    let unidade = unitMap(mUn?.[1]);
     const total = mVal ? numBR(mVal[1]) : 0;
     if (!total) continue;
 
-    if (unidade && /^(un|bd|dz)$/.test(unidade)) {
+    if (unidade && /^(un|bd|dz)$/i.test(unidade)) {
       quantidade = Math.round(quantidade);
       while (quantidade >= 1000 && quantidade % 1000 === 0) quantidade /= 1000;
     }
 
     let peso: number | undefined;
     let preco = 0;
-    if (unidade && /^(kg|g|l|ml)$/.test(unidade)) {
+    if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
       peso = quantidade;
       quantidade = 1;
       preco = total;
@@ -232,7 +245,6 @@ function parseGeneric(doc: Document): ReceiptParseResult | null {
       preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
     }
 
-    if (!nome || (!preco && !total)) continue;
     itens.push({ nome, quantidade, unidade, peso, preco, total });
   }
 
@@ -240,7 +252,58 @@ function parseGeneric(doc: Document): ReceiptParseResult | null {
   return { name: "Compra (NFC-e)", itens };
 }
 
-/* ------------- FUNÇÃO QUE SUA TELA USA (mantida) ------------- */
+/* -------- fallback genérico por texto -------- */
+function parseGenericTEXT(doc: Document): ReceiptParseResult | null {
+  const txt = (doc.body?.innerText || "").replace(/\t/g, " ").replace(/\r/g, "");
+  const linhas = txt.split(/\n+/).map(s => s.trim()).filter(Boolean);
+
+  const itens: ReceiptItem[] = [];
+
+  for (let i = 0; i < linhas.length; i++) {
+    const line = linhas[i];
+    if (!/\(c[oó]digo:\s*\d+\)/i.test(line)) continue;
+
+    const nome = cleanName(line.replace(/\(c[oó]digo:\s*\d+\)/i, ""));
+    if (!nome) continue;
+
+    const windowLines = [linhas[i], linhas[i+1], linhas[i+2], linhas[i+3]]
+      .filter(Boolean).join(" | ");
+
+    const mVal = windowLines.match(/R\$\s*([\d.,]+)/i);
+    const total = mVal ? numBR(mVal[1]) : 0;
+    if (!total) continue;
+
+    const qtd1 = windowLines.match(/(?:qtde|qtd|quant|itens:?)\s*[: ]\s*([\d.,]+)/i);
+    const qtd2 = windowLines.match(/([\d.,]+)\s*(kg|g|l|ml|un|u|und|unid|bd|dz)\b/i);
+    const mQtd = qtd1 || qtd2;
+    let quantidade = mQtd ? parseQtyMG(mQtd[1]) : 1;
+
+    const unidade = unitMapLoose(qtd2?.[2]) ||
+      unitMapLoose(windowLines.match(/\b(un|u|und|unid|kg|g|l|ml|bd|dz|fr)\b/i)?.[1]);
+
+    if (unidade && /^(un|bd|dz)$/i.test(unidade)) {
+      quantidade = Math.round(quantidade);
+      while (quantidade >= 1000 && quantidade % 1000 === 0) quantidade /= 1000;
+    }
+
+    let peso: number | undefined;
+    let preco = 0;
+    if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) {
+      peso = quantidade;
+      quantidade = 1;
+      preco = total;
+    } else {
+      preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
+    }
+
+    itens.push({ nome, quantidade, unidade, peso, preco, total });
+  }
+
+  if (!itens.length) return null;
+  return { name: "Compra (NFC-e)", itens };
+}
+
+/* ------------- FUNÇÕES PÚBLICAS ------------- */
 export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult> {
   const { html } = await fetchHtml(url);
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -248,17 +311,23 @@ export async function parseNFCeFromUrl(url: string): Promise<ReceiptParseResult>
   const mg = parsePortalMG(doc);
   if (mg) return mg;
 
-  const gen = parseGeneric(doc);
-  if (gen) return gen;
+  const genDom = parseGenericDOM(doc);
+  if (genDom) return genDom;
+
+  const genText = parseGenericTEXT(doc);
+  if (genText) return genText;
 
   return { name: "Compra (NFC-e)", itens: [] };
 }
 
-/* ------------- OPÇÃO PARA SALVAR (sem quebrar a UI) ------------- */
-export async function parseNFCeWithMeta(url: string) {
+export async function parseNFCeWithMeta(url: string): Promise<ParseWithMetaResult> {
   const { html } = await fetchHtml(url);
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const parsed = parsePortalMG(doc) ?? parseGeneric(doc) ?? { itens: [] };
+  const parsed =
+    parsePortalMG(doc) ??
+    parseGenericDOM(doc) ??
+    parseGenericTEXT(doc) ??
+    { itens: [] };
 
   const uf = extractUF(url, doc) ?? "MG";
   const accessKey = extractAccessKey(url, doc) ?? "0".repeat(44);
@@ -277,6 +346,7 @@ export async function parseNFCeWithMeta(url: string) {
   return { parsed, meta };
 }
 
+/* ------------- ENVIO PARA A API ------------- */
 export async function sendParsedReceiptToApi(meta: ReceiptMeta, parsed: ReceiptParseResult) {
   const items = (parsed.itens || []).map((i) => {
     const isPeso = !!i.unidade && /^(kg|g|l|ml)$/i.test(i.unidade);
