@@ -1,3 +1,4 @@
+// src/context/DataContext.tsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "@/services/firebase";
 import { signInAnonymously } from "firebase/auth";
@@ -94,7 +95,11 @@ interface DataContextType {
     meta: Partial<Pick<Purchase, "name" | "market" | "createdAt">>
   ): Promise<void>;
   deletePurchaseInContext(purchaseId: string): Promise<void>;
-  updatePurchaseItemInContext(purchaseId: string, index: number, item: PurchaseItem): Promise<void>;
+  updatePurchaseItemInContext(
+    purchaseId: string,
+    index: number,
+    item: Partial<PurchaseItem>
+  ): Promise<void>;
   deletePurchaseItemInContext(purchaseId: string, index: number): Promise<void>;
   appendItemsToPurchaseById(purchaseId: string, items: PurchaseItem[]): Promise<void>;
   appendItemsToPurchaseInContext(items: PurchaseItem[]): Promise<string | null>;
@@ -123,6 +128,11 @@ async function ensureAuth(): Promise<string> {
 function getUid(): string | null {
   return auth.currentUser?.uid || getStoredUserId();
 }
+
+/* ================== util ================== */
+const lineTotal = (it: any) =>
+  (typeof it.total === "number" && it.total) ||
+  (Number(it.preco) || 0) * (Number(it.quantidade) || 1);
 
 /* ================== Contexto ================== */
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -189,7 +199,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userId = getUid();
     if (!userId) return;
     await deleteItemFromFirestore(userId, listId, itemId);
-    setLists((prev) => prev.map((l) => (l.id === listId ? { ...l, itens: (l.itens || []).filter((i) => i.id !== itemId) } : l)));
+    setLists((prev) =>
+      prev.map((l) => (l.id === listId ? { ...l, itens: (l.itens || []).filter((i) => i.id !== itemId) } : l))
+    );
   };
 
   const updateListNameInContext = (listId: string, novoNome: string) => {
@@ -306,22 +318,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
+  /* >>> Função que faltava */
   const deletePurchaseInContext = async (purchaseId: string) => {
     const userId = getUid();
     if (!userId) return;
     await deletePurchase(userId, purchaseId);
     setPurchases((prev) => prev.filter((p) => p.id !== purchaseId));
   };
+  /* <<< */
 
-  const updatePurchaseItemInContext = async (purchaseId: string, index: number, item: PurchaseItem) => {
+  // Merge de item sem sobrescrever campos existentes
+  const updatePurchaseItemInContext = async (
+    purchaseId: string,
+    index: number,
+    item: Partial<PurchaseItem>
+  ) => {
     const userId = getUid();
     if (!userId) return;
-    await updatePurchaseItem(userId, purchaseId, index, item);
+    await updatePurchaseItem(userId, purchaseId, index, item as PurchaseItem);
     setPurchases((prev) =>
       prev.map((p) => {
         if (p.id !== purchaseId) return p;
-        const itens = p.itens.map((it, i) => (i === index ? { ...item } : it));
-        const total = itens.reduce((s, it) => s + (Number(it.preco) || 0) * (Number(it.quantidade) || 1), 0);
+        const itens = p.itens.map((it, i) => (i === index ? { ...it, ...item } : it));
+        const total = itens.reduce((s, it) => s + lineTotal(it), 0);
         return { ...p, itens, itemCount: itens.length, total };
       })
     );
@@ -335,7 +354,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       prev.map((p) => {
         if (p.id !== purchaseId) return p;
         const itens = p.itens.filter((_, i) => i !== index);
-        const total = itens.reduce((s, it) => s + (Number(it.preco) || 0) * (Number(it.quantidade) || 1), 0);
+        const total = itens.reduce((s, it) => s + lineTotal(it), 0);
         return { ...p, itens, itemCount: itens.length, total };
       })
     );
@@ -352,9 +371,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
               ...p,
               itens: [...(p.itens || []), ...items],
               itemCount: (p.itemCount || 0) + items.length,
-              total:
-                (typeof p.total === "number" ? p.total : 0) +
-                items.reduce((s, it) => s + (Number(it.preco) || 0) * (Number(it.quantidade) || 1), 0),
+              total: (typeof p.total === "number" ? p.total : 0) + items.reduce((s, it) => s + lineTotal(it), 0),
             }
           : p
       )
@@ -369,7 +386,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const purchaseId = purchases[0].id;
     await appendItemsToPurchase({ userId, purchaseId, items });
 
-    setPurchases((prev) => prev.map((p) => (p.id === purchaseId ? { ...p, itens: [...(p.itens || []), ...items] } : p)));
+    setPurchases((prev) =>
+      prev.map((p) => (p.id === purchaseId ? { ...p, itens: [...(p.itens || []), ...items] } : p))
+    );
     return purchaseId;
   };
 

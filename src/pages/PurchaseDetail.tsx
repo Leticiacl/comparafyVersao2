@@ -15,10 +15,7 @@ import PurchaseItemModal, {
 import { useData } from "@/context/DataContext";
 import { anyToISODate, isoToDisplay } from "@/utils/date";
 import { formatBRL, computePurchaseTotal } from "@/utils/price";
-import {
-  resolveProductImage,
-  PLACEHOLDER_DATA_URI,
-} from "@/services/imageResolver";
+import { resolveProductImage, PLACEHOLDER_DATA_URI } from "@/services/imageResolver";
 
 function dateOnlyDisplay(any: any): string {
   const iso = anyToISODate(
@@ -30,6 +27,7 @@ function dateOnlyDisplay(any: any): string {
 export default function PurchaseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const {
     purchases = [],
     renamePurchaseInContext,
@@ -39,7 +37,10 @@ export default function PurchaseDetail() {
     appendItemsToPurchaseById,
   } = useData() as any;
 
-  const p = useMemo(() => purchases.find((x: any) => x.id === id), [purchases, id]);
+  const p = useMemo(
+    () => purchases.find((x: any) => x.id === id),
+    [purchases, id]
+  );
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [newName, setNewName] = useState(p?.name || "");
@@ -55,9 +56,10 @@ export default function PurchaseDetail() {
   };
   const [edit, setEdit] = useState<EditState | null>(null);
 
+  // cache local no componente: índice -> url
   const [imgByIndex, setImgByIndex] = useState<Record<number, string>>({});
 
-  // ⚠️ Correção: ao salvar imageUrl, mesclar com o item existente
+  // Resolve imagens sem alterar preço/quantidade
   useEffect(() => {
     let cancelled = false;
 
@@ -66,20 +68,22 @@ export default function PurchaseDetail() {
 
       const entries = await Promise.all(
         p.itens.map(async (it: any, i: number) => {
-          // já tem imagem? usa
+          // se já tem imageUrl salvo no item, usa
           if (it?.imageUrl) return [i, it.imageUrl] as const;
 
           const name = String(it?.nome || it?.name || "").trim();
           if (!name) return [i, PLACEHOLDER_DATA_URI] as const;
 
+          // busca online (OpenFoodFacts/Bing) – implementação dentro do serviço
           const u = (await resolveProductImage(name)) || PLACEHOLDER_DATA_URI;
 
-          // mescla ao atualizar para não perder campos
+          // persiste SOMENTE imageUrl no item
           try {
-            await updatePurchaseItemInContext(p.id, i, { ...it, imageUrl: u });
+            await updatePurchaseItemInContext(p.id, i, { imageUrl: u });
           } catch {
-            // ignora erros de atualização silenciosamente
+            // se falhar a persistência, seguimos ao menos mostrando no estado local
           }
+
           return [i, u] as const;
         })
       );
@@ -106,6 +110,7 @@ export default function PurchaseDetail() {
     );
   }
 
+  // Compras importadas por NFC-e não permitem adicionar itens manualmente
   const canAddItems = p?.source !== "receipt";
   const total = computePurchaseTotal(p);
 
@@ -189,22 +194,23 @@ export default function PurchaseDetail() {
         <img src="/LOGO_REDUZIDA.png" alt="Logo" className="ml-2 h-8" />
       </div>
 
-      {/* Adicionar item */}
+      {/* Adicionar item (desativado para receipt) */}
       {canAddItems && (
         <button
           onClick={() => setAddOpen(true)}
-          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 py-3 font-medium text-black shadow active:scale-[0.99]"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-500 py-3 font-medium text_black shadow active:scale-[0.99]"
         >
           <span className="text-2xl leading-none">+</span> Adicionar item
         </button>
       )}
 
-      {/* Itens */}
+      {/* Lista de itens */}
       <div className="overflow-hidden rounded-2xl border border-gray-200">
         {p.itens?.map((it: any, i: number) => {
           const linhaTotal =
             (typeof it.total === "number" && it.total) ||
             (Number(it.preco) || 0) * (Number(it.quantidade) || 1);
+
           const img = it?.imageUrl || imgByIndex[i] || PLACEHOLDER_DATA_URI;
 
           return (
@@ -218,7 +224,8 @@ export default function PurchaseDetail() {
                   alt={it?.nome || "Produto"}
                   className="h-12 w-12 object-cover"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = PLACEHOLDER_DATA_URI;
+                    (e.currentTarget as HTMLImageElement).src =
+                      PLACEHOLDER_DATA_URI;
                   }}
                   loading="lazy"
                 />
@@ -232,7 +239,9 @@ export default function PurchaseDetail() {
                   {Number(it.quantidade) || 1}× · {it.unidade || "un"}{" "}
                   {it.peso ? `· ${it.peso}` : ""}
                 </div>
-                <div className="text-sm text-gray-500">UN. {formatBRL(it.preco)}</div>
+                <div className="text-sm text-gray-500">
+                  UN. {formatBRL(it.preco)}
+                </div>
 
                 {canAddItems && (
                   <div className="mt-2 flex items-center gap-4 text-sm">
@@ -311,7 +320,9 @@ export default function PurchaseDetail() {
                   <input
                     className="w-full rounded-lg border px-3 py-2"
                     value={edit.nome}
-                    onChange={(e) => setEdit({ ...edit, nome: e.target.value })}
+                    onChange={(e) =>
+                      setEdit({ ...edit, nome: e.target.value })
+                    }
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -348,7 +359,10 @@ export default function PurchaseDetail() {
                       className="w-full rounded-lg border px-3 py-2"
                       value={edit.preco}
                       onChange={(e) =>
-                        setEdit({ ...edit, preco: Number(e.target.value || 0) })
+                        setEdit({
+                          ...edit,
+                          preco: Number(e.target.value || 0),
+                        })
                       }
                     />
                   </div>
@@ -366,7 +380,6 @@ export default function PurchaseDetail() {
                     onClick={async () => {
                       if (!edit) return;
                       await updatePurchaseItemInContext(p.id, edit.index, {
-                        ...p.itens[edit.index],
                         nome: edit.nome,
                         quantidade: edit.quantidade,
                         unidade: edit.unidade,

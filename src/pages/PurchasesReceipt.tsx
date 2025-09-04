@@ -156,8 +156,7 @@ export default function PurchasesReceipt() {
             it?.marca || it?.brand || null,
             it?.ean || it?.codigo || it?.code || null
           );
-          const norm = normalizeItem(it);
-          return { ...norm, imageUrl };
+          return { ...it, imageUrl };
         })
       );
 
