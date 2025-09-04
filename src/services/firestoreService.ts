@@ -35,6 +35,7 @@ export type PurchaseItem = {
   preco: number; // unitário (ou total quando item por peso)
   mercado?: string;
   total?: number; // opcional (quando já vem total da linha)
+  imageUrl?: string; // <-- NOVO: persistimos a imagem no Firestore
 };
 
 export type Purchase = {
@@ -101,6 +102,7 @@ function sanitizePurchaseItem(raw: any) {
   if (raw?.unidade) doc.unidade = String(raw.unidade);
   if (typeof raw?.peso === "number") doc.peso = Number(raw.peso);
   if (raw?.mercado) doc.mercado = String(raw.mercado);
+  if (raw?.imageUrl) doc.imageUrl = String(raw.imageUrl); // <-- NOVO
 
   return doc;
 }
@@ -151,6 +153,7 @@ export async function fetchItemsFromList(userId: string, listId: string) {
       observacoes: x.observacoes ?? "",
       comprado: !!x.comprado,
       peso: typeof x.peso === "number" ? x.peso : undefined,
+      imageUrl: x.imageUrl || undefined, // <-- NOVO
     };
   });
 }
@@ -286,6 +289,7 @@ export async function fetchPurchasesForUser(userId: string): Promise<Purchase[]>
         preco: Number(x.preco ?? 0),
         mercado: x.mercado,
         total: typeof x.total === "number" ? Number(x.total) : Number(x.preco || 0) * Number(x.quantidade || 1),
+        imageUrl: x.imageUrl || undefined, // <-- NOVO
       };
     });
 
@@ -332,6 +336,7 @@ export async function createPurchaseFromList(params: {
       peso: typeof x.peso === "number" ? x.peso : undefined,
       preco: Number(x.preco ?? 0),
       mercado: x.mercado ?? "",
+      imageUrl: x.imageUrl || undefined, // preserva se já existia
     });
   }
   const itens: PurchaseItem[] = [...listaItens, ...(extras || [])];

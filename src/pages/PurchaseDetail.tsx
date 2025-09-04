@@ -74,10 +74,10 @@ export default function PurchaseDetail() {
           const name = String(it?.nome || it?.name || "").trim();
           if (!name) return [i, PLACEHOLDER_DATA_URI] as const;
 
-          // busca online (OpenFoodFacts/Bing) – implementação dentro do serviço
+          // busca online (OpenFoodFacts) – implementação dentro do serviço
           const u = (await resolveProductImage(name)) || PLACEHOLDER_DATA_URI;
 
-          // persiste SOMENTE imageUrl no item
+          // persiste SOMENTE imageUrl no item (não toca preço/quantidade)
           try {
             await updatePurchaseItemInContext(p.id, i, { imageUrl: u });
           } catch {

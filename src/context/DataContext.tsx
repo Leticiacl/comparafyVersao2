@@ -318,14 +318,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  /* >>> Função que faltava */
   const deletePurchaseInContext = async (purchaseId: string) => {
     const userId = getUid();
     if (!userId) return;
     await deletePurchase(userId, purchaseId);
     setPurchases((prev) => prev.filter((p) => p.id !== purchaseId));
   };
-  /* <<< */
 
   // Merge de item sem sobrescrever campos existentes
   const updatePurchaseItemInContext = async (
@@ -335,7 +333,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     const userId = getUid();
     if (!userId) return;
-    await updatePurchaseItem(userId, purchaseId, index, item as PurchaseItem);
+    // ✅ envia PATCH parcial sem fazer cast para PurchaseItem
+    await updatePurchaseItem(userId, purchaseId, index, item);
     setPurchases((prev) =>
       prev.map((p) => {
         if (p.id !== purchaseId) return p;
