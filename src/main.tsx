@@ -1,31 +1,27 @@
+// src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { DataProvider } from "./context/DataContext";
 import "./index.css";
+import { DataProvider } from "@/context/DataContext";
 
-// 🔸 GARANTE que o categorizador esteja pronto antes de montar a árvore
-import { initCategorizer } from "@/assets/catalog-data/initCategorizer";
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <DataProvider>
+        <App />
+      </DataProvider>
+    </BrowserRouter>
+  </React.StrictMode>
+);
 
-if (import.meta.env.DEV && 'serviceWorker' in navigator) {
-  const host = location.host;
-  const isStackBlitz = host.includes('stackblitz') || host.includes('webcontainer.io');
-  if (isStackBlitz) {
-    navigator.serviceWorker.getRegistrations()
-      .then(regs => regs.forEach(r => r.unregister()))
-      .catch(() => {});
+// Service Worker: ativa só em produção (evita .localservice navegar / prender navegação no StackBlitz)
+if ("serviceWorker" in navigator) {
+  if (import.meta.env.PROD) {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+  } else {
+    // Em dev, limpe qualquer SW antigo
+    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
   }
 }
-
-initCategorizer().finally(() => {
-  ReactDOM.createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-      <BrowserRouter>
-        <DataProvider>
-          <App />
-        </DataProvider>
-      </BrowserRouter>
-    </React.StrictMode>
-  );
-});

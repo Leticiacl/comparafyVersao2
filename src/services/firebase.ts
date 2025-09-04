@@ -1,40 +1,24 @@
 // src/services/firebase.ts
-import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getAuth, type Auth, GoogleAuthProvider, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-
-function required(name: string, value: string | undefined) {
-  if (!value) throw new Error(`[Firebase ENV] Faltando ${name}. Verifique as env VITE_* no Vercel/.env.local.`);
-  return value;
-}
-
-const apiKey = required('VITE_FIREBASE_API_KEY', import.meta.env.VITE_FIREBASE_API_KEY);
-
-// 👇 ajuda a detectar env errado rapidamente
-if (import.meta.env.DEV) {
-  // mostra só os 5 primeiros chars para não vazar a key
-  console.log('[Firebase ENV] apiKey prefix:', String(apiKey).slice(0, 5));
-}
-
-if (!apiKey.startsWith('AIza')) {
-  throw new Error('[Firebase ENV] apiKey inválida (não começa com "AIza"). Confira as env no Vercel/.env.local.');
-}
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { ENV } from "@/env";
 
 const firebaseConfig = {
-  apiKey,
-  authDomain: required('VITE_FIREBASE_AUTH_DOMAIN', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
-  projectId: required('VITE_FIREBASE_PROJECT_ID', import.meta.env.VITE_FIREBASE_PROJECT_ID),
-  storageBucket: required('VITE_FIREBASE_STORAGE_BUCKET', import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
-  messagingSenderId: required('VITE_FIREBASE_MESSAGING_SENDER_ID', import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
-  appId: required('VITE_FIREBASE_APP_ID', import.meta.env.VITE_FIREBASE_APP_ID),
+  apiKey: ENV.FIREBASE_API_KEY,
+  authDomain: ENV.FIREBASE_AUTH_DOMAIN,
+  projectId: ENV.FIREBASE_PROJECT_ID,
+  storageBucket: ENV.FIREBASE_STORAGE_BUCKET, // TEM que terminar com .appspot.com
+  messagingSenderId: ENV.FIREBASE_MESSAGING_SENDER_ID,
+  appId: ENV.FIREBASE_APP_ID,
 };
 
-export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+const app = initializeApp(firebaseConfig);
 
-// persistência padrão
-auth.setPersistence(browserLocalPersistence).catch(() => {});
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
+// >>> ESTE EXPORT resolve "does not provide an export named 'googleProvider'"
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });

@@ -12,6 +12,9 @@ export type ReceiptItem = {
   peso?: number;     // quando for kg/g/l/ml
   preco: number;     // preço unitário mostrado no app ou total (para peso)
   total?: number;    // total da linha (opcional)
+  // >>> adicionados (opcionais)
+  ean?: string | null;
+  marca?: string | null;
 };
 export type ReceiptParseResult = {
   name?: string;
@@ -41,6 +44,35 @@ function cleanName(raw: string) {
   s = s.replace(/\b(qtde|qtd|quant(?:idade)?|qtde total de itens|itens)\s*[:\-]?\s*[\d.,]+/gi, "");
   s = s.replace(/[|]/g, " ").replace(/\s{2,}/g, " ").trim();
   return title(stripCodigo(s));
+}
+
+// ---- EAN & marca helpers (novos) ----
+const ONLY_DIGITS = /\d+/g;
+// Aceita EAN-8/12/13/14 (GTIN-14) — filtra sequências plausíveis
+function findEANInText(s?: string | null): string | null {
+  if (!s) return null;
+  const parts = String(s).match(ONLY_DIGITS);
+  if (!parts) return null;
+  for (const d of parts) {
+    const len = d.length;
+    if (len === 8 || len === 12 || len === 13 || len === 14) return d;
+  }
+  return null;
+}
+function pickEAN(obj: any): string | null {
+  const cands = [obj?.cEAN, obj?.cEANTrib, obj?.ean, obj?.codigoBarras, obj?.codigo, obj?.code]
+    .filter(Boolean);
+  for (const c of cands) {
+    const e = findEANInText(String(c));
+    if (e) return e;
+  }
+  // fallback: procurar no nome/descrição
+  return findEANInText(obj?.nome || obj?.descricao || obj?.desc || null);
+}
+function guessBrandFromName(name?: string): string | null {
+  if (!name) return null;
+  const w = name.trim().split(/\s+/).find((p) => p.length >= 3);
+  return w || null;
 }
 
 /* ---------------- fetch ---------------- */
@@ -165,7 +197,12 @@ function parsePortalMG(doc: Document): ReceiptParseResult | null {
     }
 
     if (!nome || (!preco && !total)) continue;
-    itens.push({ nome, quantidade: Math.max(1, quantidade), unidade, peso, preco, total });
+
+    // >>> enriquecer com ean/marca
+    const ean = pickEAN({ nome: firstCell });
+    const marca = guessBrandFromName(nome);
+
+    itens.push({ nome, quantidade: Math.max(1, quantidade), unidade, peso, preco, total, ean, marca });
   }
 
   if (!itens.length) return null;
@@ -208,7 +245,10 @@ function parseGenericTable(doc: Document): ReceiptParseResult | null {
       preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total;
     }
 
-    itens.push({ nome, quantidade, unidade, peso, preco, total });
+    const ean = pickEAN({ nome: cells[0] || nome, linha: line });
+    const marca = guessBrandFromName(nome);
+
+    itens.push({ nome, quantidade, unidade, peso, preco, total, ean, marca });
   }
   if (!itens.length) return null;
   return { name: "Compra (NFC-e)", itens };
@@ -237,7 +277,10 @@ function parseFromPlainText(doc: Document): ReceiptParseResult | null {
     if (unidade && /^(kg|g|l|ml)$/i.test(unidade)) { peso = quantidade; quantidade = 1; preco = total; }
     else { preco = quantidade > 0 ? +(total / quantidade).toFixed(2) : total; }
 
-    itens.push({ nome, quantidade, unidade, peso, preco, total });
+    const ean = pickEAN({ nome, trecho: m[0] });
+    const marca = guessBrandFromName(nome);
+
+    itens.push({ nome, quantidade, unidade, peso, preco, total, ean, marca });
   }
 
   let totalItems: number | undefined;
@@ -298,7 +341,7 @@ export async function sendParsedReceiptToApi(meta: ReceiptMeta, parsed: ReceiptP
     } else { unitPrice = i.preco; }
     const quantity = isPeso ? 1 : i.quantidade;
 
-    return { rawDesc: i.nome, quantity, unit: unidade, unitPrice, total: totalLinha };
+    return { rawDesc: i.nome, quantity, unit: unidade, unitPrice, total: totalLinha, ean: i.ean || undefined };
   });
 
   const payload = {
